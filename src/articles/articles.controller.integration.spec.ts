@@ -4,6 +4,7 @@ import { INestApplication } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { ArticlesController } from './articles.controller';
 import { ScrapingService } from '../scraping/scraping.service';
+import { ArticleScraperService } from '../scraping/article-scraper.service';
 import { Article } from '../entities/article.entity';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -23,6 +24,7 @@ describe('ArticlesController Integration', () => {
   let controller: ArticlesController;
   let articleRepository: Repository<Article>;
   let scrapingService: ScrapingService;
+  let articleScraperService: ArticleScraperService;
   let module: TestingModule;
 
   beforeAll(async () => {
@@ -46,7 +48,7 @@ describe('ArticlesController Integration', () => {
         TypeOrmModule.forFeature([Article]),
       ],
       controllers: [ArticlesController],
-      providers: [ScrapingService],
+      providers: [ScrapingService, ArticleScraperService],
     }).compile();
 
     app = module.createNestApplication();
@@ -57,12 +59,28 @@ describe('ArticlesController Integration', () => {
       getRepositoryToken(Article),
     );
     scrapingService = module.get<ScrapingService>(ScrapingService);
+    articleScraperService = module.get<ArticleScraperService>(
+      ArticleScraperService,
+    );
 
     // Mock the RSS parser to prevent real network requests
     const mockParser = {
       parseURL: jest.fn().mockResolvedValue({ items: [] }),
     };
     (scrapingService as any).parser = mockParser;
+
+    // Mock the ArticleScraperService to prevent real web scraping
+    (articleScraperService as any).scrapeArticlesContent = jest
+      .fn()
+      .mockResolvedValue(undefined);
+    (articleScraperService as any).getScrapingStats = jest
+      .fn()
+      .mockResolvedValue({
+        total: 0,
+        withContent: 0,
+        withoutContent: 0,
+        byStatus: {},
+      });
   });
 
   afterAll(async () => {

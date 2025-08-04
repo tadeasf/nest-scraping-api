@@ -3,6 +3,13 @@ export interface RssSource {
   url: string;
 }
 
+export interface SiteConfig {
+  selectors: string[];
+  removeSelectors?: string[];
+  delay?: number;
+  userAgent?: string;
+}
+
 export const RSS_SOURCES: RssSource[] = [
   { name: 'idnes.cz', url: 'http://servis.idnes.cz/rss.asp' },
   { name: 'hn.cz-byznys', url: 'https://byznys.hn.cz/?m=rss' },
@@ -57,6 +64,239 @@ export const RSS_SOURCES: RssSource[] = [
   },
 ];
 
+// Configuration for different news sites for article content scraping
+export const SITE_CONFIGS: Record<string, SiteConfig> = {
+  'idnes.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content .perex',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share', '.comments'],
+    delay: 1000,
+  },
+  'hn.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'aktualne.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'novinky.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'blesk.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'ct24.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'ceskatelevize.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'e15.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'lidovky.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'sport.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'lupa.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'zive.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'super.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'reflex.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'forbes.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'echo24.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'denik.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'irozhlas.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+  'ceskenoviny.cz': {
+    selectors: [
+      '.article-content .text',
+      '.article-content p',
+      '.text p',
+      '.perex',
+    ],
+    removeSelectors: ['.advertisement', '.social-share'],
+    delay: 1000,
+  },
+};
+
+// Default site configuration for unknown sites
+export const DEFAULT_SITE_CONFIG: SiteConfig = {
+  selectors: [
+    '.article-content .text',
+    '.article-content p',
+    '.text p',
+    '.perex',
+    'p',
+  ],
+  removeSelectors: ['.advertisement', '.social-share', '.comments'],
+  delay: 1000,
+};
+
+// Paywall indicators for detecting paywalled content
+export const PAYWALL_INDICATORS = [
+  'paywall',
+  'premium',
+  'předplatné',
+  'předplatit',
+  'přihlásit se',
+  'registrovat',
+  'subscribe',
+  'membership',
+  'exclusive',
+  'výhradní',
+];
+
+// Generic content selectors for fallback content extraction
+export const GENERIC_CONTENT_SELECTORS = [
+  'main',
+  'article',
+  '.main-content',
+  '.content',
+  '.article-body',
+  '.post-content',
+  '.entry-content',
+];
+
 // Helper function to get sources as a Record for validation
 export const getSourcesRecord = (): Record<string, string> => {
   return RSS_SOURCES.reduce(
@@ -66,4 +306,12 @@ export const getSourcesRecord = (): Record<string, string> => {
     },
     {} as Record<string, string>,
   );
+};
+
+// Helper function to get site configuration for a given source
+export const getSiteConfig = (source: string): SiteConfig => {
+  // Extract base domain from source
+  const baseDomain = source.split('.')[0];
+
+  return SITE_CONFIGS[baseDomain] || DEFAULT_SITE_CONFIG;
 };

@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { ScrapingService } from './scraping.service';
 import { Article } from '../entities/article.entity';
 import { getSourcesRecord } from './constants';
+import { ArticleScraperService } from './article-scraper.service';
 
 // Suppress console.error during tests to reduce noise
 const originalConsoleError = console.error;
@@ -18,6 +19,7 @@ afterAll(() => {
 describe('ScrapingService', () => {
   let service: ScrapingService;
   let mockRepository: jest.Mocked<Repository<Article>>;
+  let mockArticleScraperService: jest.Mocked<ArticleScraperService>;
 
   beforeEach(async () => {
     const mockRepositoryProvider = {
@@ -36,12 +38,24 @@ describe('ScrapingService', () => {
       },
     };
 
+    const mockArticleScraperServiceProvider = {
+      provide: ArticleScraperService,
+      useValue: {
+        scrapeArticlesContent: jest.fn(),
+      },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ScrapingService, mockRepositoryProvider],
+      providers: [
+        ScrapingService,
+        mockRepositoryProvider,
+        mockArticleScraperServiceProvider,
+      ],
     }).compile();
 
     service = module.get<ScrapingService>(ScrapingService);
     mockRepository = module.get(getRepositoryToken(Article));
+    mockArticleScraperService = module.get(ArticleScraperService);
   });
 
   afterEach(() => {
@@ -83,6 +97,24 @@ describe('ScrapingService', () => {
       expect(result).toBeDefined();
       expect(result.source).toBe('all');
       expect(result.status).toBe('scheduled');
+    });
+
+    it('should trigger article content scraping after RSS scraping', async () => {
+      // Mock the RSS parser to prevent real network requests
+      const mockParser = {
+        parseURL: jest.fn().mockResolvedValue({ items: [] }),
+      };
+      (service as any).parser = mockParser;
+
+      const result = await service.scrapeImmediately('idnes.cz');
+
+      // Wait for the background job to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(result).toBeDefined();
+      expect(
+        mockArticleScraperService.scrapeArticlesContent,
+      ).toHaveBeenCalled();
     });
   });
 

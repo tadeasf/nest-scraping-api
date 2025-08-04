@@ -11,9 +11,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Article } from '../entities/article.entity';
 import { ScrapingService } from '../scraping/scraping.service';
+import { ArticleScraperService } from '../scraping/article-scraper.service';
 
 interface SourceCount {
   source: string;
@@ -27,6 +28,7 @@ export class ArticlesController {
     @InjectRepository(Article)
     private readonly _articleRepository: Repository<Article>,
     private readonly _scrapingService: ScrapingService,
+    private readonly _articleScraperService: ArticleScraperService,
   ) {}
 
   @Get()
@@ -127,6 +129,14 @@ export class ArticlesController {
       today: todayArticles,
       bySource: sourceStats,
     };
+  }
+
+  @Get('content-stats')
+  @ApiOperation({ summary: 'Get article content scraping statistics' })
+  @ApiResponse({ status: 200, description: 'Content scraping statistics' })
+  async getContentStats() {
+    const stats = await this._articleScraperService.getScrapingStats();
+    return stats;
   }
 
   @Get(':id')
@@ -280,6 +290,60 @@ export class ArticlesController {
       }
       throw new HttpException(
         'Failed to trigger scraping',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('scrape-content')
+  @ApiOperation({ summary: 'Trigger immediate article content scraping' })
+  @ApiResponse({
+    status: 200,
+    description: 'Content scraping triggered successfully',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Maximum number of articles to scrape (default: 50)',
+  })
+  async triggerContentScraping(@Query('limit') limit?: string) {
+    try {
+      const maxArticles = limit ? parseInt(limit, 10) : 50;
+
+      // Get articles without content
+      const articles = await this._articleRepository.find({
+        where: { content: IsNull() },
+        order: { createdAt: 'DESC' },
+        take: maxArticles,
+      });
+
+      if (articles.length === 0) {
+        return {
+          success: true,
+          message: 'No articles found without content',
+          articlesToScrape: 0,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      // Trigger content scraping in background
+      setImmediate(async () => {
+        try {
+          await this._articleScraperService.scrapeArticlesContent(articles);
+        } catch (_error) {
+          // Background content scraping failed silently
+        }
+      });
+
+      return {
+        success: true,
+        message: `Content scraping scheduled for ${articles.length} articles`,
+        articlesToScrape: articles.length,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (_error) {
+      throw new HttpException(
+        'Failed to trigger content scraping',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { Article } from '../entities/article.entity';
 import * as crypto from 'crypto';
 import { RSS_SOURCES, getSourcesRecord } from './constants';
+import { ArticleScraperService } from './article-scraper.service';
 
 interface RssItem {
   title?: string;
@@ -37,6 +38,7 @@ export class ScrapingService {
   constructor(
     @InjectRepository(Article)
     private readonly _articleRepository: Repository<Article>,
+    private readonly _articleScraperService: ArticleScraperService,
   ) {
     this.parser = new Parser();
   }
@@ -58,6 +60,15 @@ export class ScrapingService {
 
     await Promise.all(scrapingPromises);
     this.logger.log('Hourly scraping completed');
+
+    // Trigger article content scraping after RSS scraping is complete
+    this.logger.log('Starting article content scraping...');
+    try {
+      await this._articleScraperService.scrapeArticlesContent();
+      this.logger.log('Article content scraping completed');
+    } catch (error) {
+      this.logger.error('Failed to scrape article content:', error);
+    }
   }
 
   async scrapeImmediately(source?: string) {
@@ -93,6 +104,15 @@ export class ScrapingService {
 
           await Promise.all(scrapingPromises);
           this.logger.log('Background scraping completed for all sources');
+        }
+
+        // Trigger article content scraping after RSS scraping is complete
+        this.logger.log('Starting article content scraping...');
+        try {
+          await this._articleScraperService.scrapeArticlesContent();
+          this.logger.log('Article content scraping completed');
+        } catch (error) {
+          this.logger.error('Failed to scrape article content:', error);
         }
       } catch (error) {
         const errorMessage =

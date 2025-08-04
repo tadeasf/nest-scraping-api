@@ -36,4 +36,17 @@ export class Article {
 
   @CreateDateColumn()
   createdAt: Date;
+
+  // New fields for article content scraping
+  @Column({ type: 'text', nullable: true })
+  content: string;
+
+  @Column({ nullable: true })
+  contentScrapedAt: Date;
+
+  @Column({ nullable: true })
+  contentScrapingStatus: string; // 'success', 'failed', 'paywall', 'timeout', 'not_found'
+
+  @Column({ nullable: true })
+  contentLength: number;
 }
