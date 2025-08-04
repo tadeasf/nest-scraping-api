@@ -10,6 +10,7 @@ import {
   GENERIC_CONTENT_SELECTORS,
 } from './constants';
 
+
 interface ScrapingResult {
   success: boolean;
   content?: string;
@@ -62,24 +63,60 @@ export class ArticleScraperService {
   async scrapeArticlesContent(articles?: Article[]): Promise<void> {
     this.logger.log('Starting article content scraping...');
 
-    // If no articles provided, get articles without content, limited to 50
-    if (!articles) {
-      articles = await this._articleRepository.find({
-        where: { content: IsNull() },
-        order: { createdAt: 'DESC' },
-        take: 50, // Always limit to 50 articles
-      });
+    let totalSuccessCount = 0;
+    let totalFailCount = 0;
+    let batchNumber = 0;
+
+    // If articles are provided, process them directly
+    if (articles) {
+      articles = articles.slice(0, 50); // Limit provided articles to 50
+      const results = await this.processArticleBatch(articles, batchNumber);
+      totalSuccessCount += results.successCount;
+      totalFailCount += results.failCount;
     } else {
-      // If articles are provided, still limit to 50
-      articles = articles.slice(0, 50);
+      // Process all articles without content in batches of 50
+      let hasMoreArticles = true;
+
+      while (hasMoreArticles) {
+        batchNumber++;
+        const batchArticles = await this._articleRepository.find({
+          where: { content: IsNull() },
+          order: { createdAt: 'DESC' },
+          take: 50, // Process 50 articles per batch
+        });
+
+        if (batchArticles.length === 0) {
+          hasMoreArticles = false;
+          break;
+        }
+
+        this.logger.log(`Processing batch ${batchNumber}: ${batchArticles.length} articles`);
+
+        const results = await this.processArticleBatch(batchArticles, batchNumber);
+        totalSuccessCount += results.successCount;
+        totalFailCount += results.failCount;
+
+
+
+        // If we got less than 50 articles, we've processed all available articles
+        if (batchArticles.length < 50) {
+          hasMoreArticles = false;
+        }
+      }
     }
 
-    if (articles.length === 0) {
-      this.logger.log('No articles to scrape content for');
-      return;
-    }
+    this.logger.log(
+      `Article content scraping completed. Total Success: ${totalSuccessCount}, Total Failed: ${totalFailCount}, Batches: ${batchNumber}`,
+    );
 
-    this.logger.log(`Found ${articles.length} articles to scrape content for`);
+    if (totalSuccessCount + totalFailCount > 0) {
+      const overallSuccessRate = ((totalSuccessCount / (totalSuccessCount + totalFailCount)) * 100).toFixed(1);
+      this.logger.log(`Overall success rate: ${overallSuccessRate}%`);
+    }
+  }
+
+  private async processArticleBatch(articles: Article[], batchNumber: number): Promise<{ successCount: number; failCount: number }> {
+    this.logger.log(`Found ${articles.length} articles to scrape content for in batch ${batchNumber}`);
 
     // Scrape articles concurrently with rate limiting
     const scrapingPromises = articles.map((article) =>
@@ -88,21 +125,43 @@ export class ArticleScraperService {
 
     const results = await Promise.allSettled(scrapingPromises);
 
-    // Count results
+    // Count results and track by source
     let successCount = 0;
     let failCount = 0;
+    const sourceStats: Record<string, { success: number; failed: number }> = {};
 
-    results.forEach((result) => {
+    results.forEach((result, index) => {
+      const article = articles[index];
+      const source = article.source;
+
+      if (!sourceStats[source]) {
+        sourceStats[source] = { success: 0, failed: 0 };
+      }
+
       if (result.status === 'fulfilled' && result.value.success) {
         successCount++;
+        sourceStats[source].success++;
       } else {
         failCount++;
+        sourceStats[source].failed++;
       }
     });
 
+    // Log batch summary with source breakdown
     this.logger.log(
-      `Article content scraping completed. Success: ${successCount}, Failed: ${failCount}`,
+      `Batch ${batchNumber} completed. Success: ${successCount}, Failed: ${failCount}`,
     );
+
+    // Log source-specific statistics
+    Object.entries(sourceStats).forEach(([source, stats]) => {
+      const total = stats.success + stats.failed;
+      const successRate = ((stats.success / total) * 100).toFixed(1);
+      this.logger.log(
+        `  [${source}]: ${stats.success}/${total} (${successRate}% success)`,
+      );
+    });
+
+    return { successCount, failCount };
   }
 
   private async scrapeArticleWithSemaphore(article: Article): Promise<ScrapingResult> {
@@ -112,10 +171,10 @@ export class ArticleScraperService {
       const result = await this.scrapeArticleContent(article);
 
       if (result.success) {
-        this.logger.log(`Successfully scraped content for: ${article.title}`);
+        this.logger.log(`Successfully scraped content for [${article.source}]: ${article.title}`);
       } else {
         this.logger.warn(
-          `Failed to scrape content for: ${article.title} - ${result.status}`,
+          `Failed to scrape content for [${article.source}]: ${article.title} - ${result.status}`,
         );
       }
 
@@ -132,7 +191,7 @@ export class ArticleScraperService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Error scraping content for ${article.title}: ${errorMessage}`,
+        `Error scraping content for [${article.source}] ${article.title}: ${errorMessage}`,
       );
 
       // Update article with error status
@@ -209,7 +268,7 @@ export class ArticleScraperService {
         content = this.extractContentGeneric($);
       }
 
-      if (!content || content.trim().length < 50) {
+      if (!content || content.trim().length < 30) {
         return {
           success: false,
           status: 'no_content',
@@ -217,7 +276,7 @@ export class ArticleScraperService {
         };
       }
 
-      // Check for paywall indicators
+      // Check for paywall indicators (very restrictive now)
       if (this.isPaywallContent($, content)) {
         return {
           success: false,
@@ -267,6 +326,8 @@ export class ArticleScraperService {
         }
       }
 
+
+
       return {
         success: false,
         status: 'error',
@@ -280,14 +341,36 @@ export class ArticleScraperService {
     for (const selector of GENERIC_CONTENT_SELECTORS) {
       const element = $(selector);
       if (element.length > 0) {
-        return element.text().trim();
+        const text = element.text().trim();
+        if (text.length > 30) {
+          return text;
+        }
+      }
+    }
+
+    // Try to find content in article tags
+    const articles = $('article');
+    if (articles.length > 0) {
+      const text = articles.text().trim();
+      if (text.length > 30) {
+        return text;
+      }
+    }
+
+    // Try to find content in main tags
+    const main = $('main');
+    if (main.length > 0) {
+      const text = main.text().trim();
+      if (text.length > 30) {
+        return text;
       }
     }
 
     // Fallback: get all paragraphs
     const paragraphs = $('p')
       .map((_, el) => $(el).text().trim())
-      .get();
+      .get()
+      .filter(text => text.length > 10); // Filter out very short paragraphs
     return paragraphs.join('\n\n');
   }
 
