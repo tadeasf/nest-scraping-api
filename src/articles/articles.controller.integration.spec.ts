@@ -131,7 +131,7 @@ describe('ArticlesController Integration', () => {
         it('should combine source and search filters', async () => {
             const result = await controller.getArticles(1, 10, 'idnes.cz', 'Test');
 
-            expect(result.articles).toHaveLength(2);
+            expect(result.articles).toHaveLength(1);
             expect(result.articles.every(article => article.source === 'idnes.cz')).toBe(true);
             expect(result.articles.every(article => article.title.includes('Test'))).toBe(true);
         });

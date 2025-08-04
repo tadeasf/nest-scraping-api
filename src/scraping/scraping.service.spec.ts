@@ -86,6 +86,9 @@ describe('ScrapingService', () => {
       const result = await service.scrapeImmediately('idnes.cz');
       expect(result).toBeDefined();
       expect(result.status).toBe('scheduled');
+
+      // Wait for setImmediate to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     it('should handle background processing for all sources', async () => {
@@ -130,9 +133,7 @@ describe('ScrapingService', () => {
       mockRepository.save.mockRejectedValue(new Error('Database error'));
 
       // This should not throw an error
-      await expect(
-        service['scrapeSource']('test-source', 'https://example.com/rss'),
-      ).resolves.not.toThrow();
+      await service['scrapeSource']('test-source', 'https://example.com/rss');
     });
   });
 
@@ -181,7 +182,7 @@ describe('ScrapingService', () => {
       (service as any).parser = mockParser;
 
       // This should not throw an error
-      await expect(service.scrapeAll()).resolves.not.toThrow();
+      await service.scrapeAll();
     });
 
     it('should handle individual source failures in scrapeAll', async () => {
@@ -197,7 +198,7 @@ describe('ScrapingService', () => {
       (service as any).parser = mockParser;
 
       // This should not throw an error even when some sources fail
-      await expect(service.scrapeAll()).resolves.not.toThrow();
+      await service.scrapeAll();
     });
   });
 
@@ -313,9 +314,7 @@ describe('ScrapingService', () => {
       (service as any).parser = mockParser;
 
       // This should not throw an error
-      await expect(
-        service['scrapeSource']('test-source', 'https://example.com/rss'),
-      ).resolves.not.toThrow();
+      await service['scrapeSource']('test-source', 'https://example.com/rss');
 
       expect(mockParser.parseURL).toHaveBeenCalledWith(
         'https://example.com/rss',
@@ -467,6 +466,39 @@ describe('ScrapingService', () => {
       const result = service['extractImageUrl'](item);
       expect(result).toBeNull();
     });
+
+    // Additional test to cover line 196 (imgMatch regex extraction)
+    it('should extract image from content HTML with img tag', () => {
+      const item = {
+        content: '<div>Some content <img src="https://example.com/photo.jpg" width="100" /></div>',
+      };
+      const result = service['extractImageUrl'](item);
+      expect(result).toBe('https://example.com/photo.jpg');
+    });
+
+    it('should extract image from summary HTML with img tag', () => {
+      const item = {
+        summary: '<p>Summary with <img src="https://example.com/summary.jpg" alt="summary" /></p>',
+      };
+      const result = service['extractImageUrl'](item);
+      expect(result).toBe('https://example.com/summary.jpg');
+    });
+
+    it('should return null when img tag has no src attribute', () => {
+      const item = {
+        content: '<div>Some content <img alt="no src" /></div>',
+      };
+      const result = service['extractImageUrl'](item);
+      expect(result).toBeNull();
+    });
+
+    it('should return null when img tag has empty src attribute', () => {
+      const item = {
+        content: '<div>Some content <img src="" alt="empty src" /></div>',
+      };
+      const result = service['extractImageUrl'](item);
+      expect(result).toBeNull();
+    });
   });
 
   describe('scrapeAll error handling', () => {
@@ -477,7 +509,7 @@ describe('ScrapingService', () => {
       (service as any).parser = mockParser;
 
       // This should not throw an error
-      await expect(service.scrapeAll()).resolves.not.toThrow();
+      await service.scrapeAll();
     });
 
     it('should handle mixed success and failure in scrapeAll', async () => {
@@ -495,7 +527,7 @@ describe('ScrapingService', () => {
       mockRepository.findOne.mockResolvedValue(null);
       mockRepository.save.mockResolvedValue({} as any);
 
-      await expect(service.scrapeAll()).resolves.not.toThrow();
+      await service.scrapeAll();
     });
   });
 
@@ -534,9 +566,7 @@ describe('ScrapingService', () => {
       };
       (service as any).parser = mockParser;
 
-      await expect(
-        service['scrapeSource']('test-source', 'https://example.com/rss'),
-      ).resolves.not.toThrow();
+      await service['scrapeSource']('test-source', 'https://example.com/rss');
     });
 
     it('should handle feed without items property', async () => {
@@ -545,9 +575,7 @@ describe('ScrapingService', () => {
       };
       (service as any).parser = mockParser;
 
-      await expect(
-        service['scrapeSource']('test-source', 'https://example.com/rss'),
-      ).resolves.not.toThrow();
+      await service['scrapeSource']('test-source', 'https://example.com/rss');
     });
 
     it('should handle items with empty content', async () => {
@@ -573,6 +601,171 @@ describe('ScrapingService', () => {
       await service['scrapeSource']('test-source', 'https://example.com/rss');
 
       expect(mockRepository.save).toHaveBeenCalled();
+    });
+
+    // Additional tests to cover lines 123-124 (error handling in scrapeSource)
+    it('should handle parser errors with Error objects', async () => {
+      const mockParser = {
+        parseURL: jest.fn().mockRejectedValue(new Error('Parser error')),
+      };
+      (service as any).parser = mockParser;
+
+      await service['scrapeSource']('test-source', 'https://example.com/rss');
+    });
+
+    it('should handle parser errors with non-Error objects', async () => {
+      const mockParser = {
+        parseURL: jest.fn().mockRejectedValue('String error'),
+      };
+      (service as any).parser = mockParser;
+
+      await service['scrapeSource']('test-source', 'https://example.com/rss');
+    });
+
+    it('should handle repository save errors', async () => {
+      const mockFeed = {
+        items: [
+          {
+            title: 'Test Article',
+            link: 'https://example.com/article',
+            content: 'Test content',
+          },
+        ],
+      };
+      const mockParser = {
+        parseURL: jest.fn().mockResolvedValue(mockFeed),
+      };
+      (service as any).parser = mockParser;
+
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.save.mockRejectedValue(new Error('Database save error'));
+
+      await service['scrapeSource']('test-source', 'https://example.com/rss');
+    });
+  });
+
+  // Additional tests to cover lines 54-55 (error handling in scrapeAll)
+  describe('scrapeAll comprehensive error handling', () => {
+    it('should handle all sources failing with Error objects', async () => {
+      const mockParser = {
+        parseURL: jest.fn().mockRejectedValue(new Error('All sources failed')),
+      };
+      (service as any).parser = mockParser;
+
+      await service.scrapeAll();
+    });
+
+    it('should handle all sources failing with non-Error objects', async () => {
+      const mockParser = {
+        parseURL: jest.fn().mockRejectedValue('String error'),
+      };
+      (service as any).parser = mockParser;
+
+      await service.scrapeAll();
+    });
+
+    it('should handle mixed success and failure scenarios', async () => {
+      const mockParser = {
+        parseURL: jest.fn().mockImplementation((url) => {
+          if (url.includes('idnes.cz')) {
+            return Promise.resolve({ items: [{ title: 'Test', link: 'http://test.com' }] });
+          }
+          return Promise.reject(new Error('Source failed'));
+        }),
+      };
+      (service as any).parser = mockParser;
+
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.save.mockResolvedValue({} as any);
+
+      await service.scrapeAll();
+    });
+  });
+
+  // Additional tests to cover lines 80-100 (setImmediate background processing)
+  describe('scrapeImmediately background processing', () => {
+    it('should handle successful background processing for single source', async () => {
+      const mockFeed = {
+        items: [
+          {
+            title: 'Test Article',
+            link: 'https://example.com/article',
+            content: 'Test content',
+          },
+        ],
+      };
+      const mockParser = {
+        parseURL: jest.fn().mockResolvedValue(mockFeed),
+      };
+      (service as any).parser = mockParser;
+
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.save.mockResolvedValue({} as any);
+
+      const result = await service.scrapeImmediately('idnes.cz');
+      expect(result.status).toBe('scheduled');
+
+      // Wait for setImmediate to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    it('should handle successful background processing for all sources', async () => {
+      const mockFeed = {
+        items: [
+          {
+            title: 'Test Article',
+            link: 'https://example.com/article',
+            content: 'Test content',
+          },
+        ],
+      };
+      const mockParser = {
+        parseURL: jest.fn().mockResolvedValue(mockFeed),
+      };
+      (service as any).parser = mockParser;
+
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.save.mockResolvedValue({} as any);
+
+      const result = await service.scrapeImmediately();
+      expect(result.status).toBe('scheduled');
+
+      // Wait for setImmediate to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    it('should handle background processing with mixed success and failure', async () => {
+      const mockParser = {
+        parseURL: jest.fn().mockImplementation((url) => {
+          if (url.includes('idnes.cz')) {
+            return Promise.resolve({ items: [{ title: 'Test', link: 'http://test.com' }] });
+          }
+          return Promise.reject(new Error('Some sources fail'));
+        }),
+      };
+      (service as any).parser = mockParser;
+
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.save.mockResolvedValue({} as any);
+
+      const result = await service.scrapeImmediately();
+      expect(result.status).toBe('scheduled');
+
+      // Wait for setImmediate to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    it('should handle background processing with all sources failing', async () => {
+      const mockParser = {
+        parseURL: jest.fn().mockRejectedValue(new Error('All sources failed')),
+      };
+      (service as any).parser = mockParser;
+
+      const result = await service.scrapeImmediately();
+      expect(result.status).toBe('scheduled');
+
+      // Wait for setImmediate to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
     });
   });
 });

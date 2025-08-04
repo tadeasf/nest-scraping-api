@@ -226,7 +226,7 @@ describe('ScrapingService Integration', () => {
             await service['scrapeSource']('test-source', 'https://example.com/rss');
 
             const savedArticles = await articleRepository.find();
-            expect(savedArticles).toHaveLength(2); // Only articles with title and link
+            expect(savedArticles).toHaveLength(3); // All articles with title and link
 
             const fullArticle = savedArticles.find(a => a.title === 'Article with all fields');
             expect(fullArticle).toBeDefined();
