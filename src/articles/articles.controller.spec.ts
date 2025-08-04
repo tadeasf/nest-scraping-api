@@ -264,6 +264,87 @@ describe('ArticlesController', () => {
     });
   });
 
+  describe('getArticlesByDate', () => {
+    it('should return articles by date with pagination', async () => {
+      const mockArticles = [
+        {
+          id: 1,
+          title: 'Test Article 1',
+          url: 'http://example.com/1',
+          source: 'idnes.cz',
+        },
+      ];
+      const mockTotal = 1;
+
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        mockArticles,
+        mockTotal,
+      ]);
+
+      const result = await controller.getArticlesByDate('2024-01-01', 1, 20);
+
+      expect(result).toEqual({
+        articles: mockArticles,
+        pagination: {
+          page: 1,
+          limit: 20,
+          total: mockTotal,
+          pages: 1,
+        },
+        date: '2024-01-01',
+      });
+    });
+
+    it('should throw error for invalid date format', async () => {
+      await expect(
+        controller.getArticlesByDate('invalid-date', 1, 20),
+      ).rejects.toThrow('Invalid date format. Use YYYY-MM-DD');
+    });
+  });
+
+  describe('getRecentArticles', () => {
+    it('should return recent articles with pagination', async () => {
+      const mockArticles = [
+        {
+          id: 1,
+          title: 'Test Article 1',
+          url: 'http://example.com/1',
+          source: 'idnes.cz',
+        },
+      ];
+      const mockTotal = 1;
+
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        mockArticles,
+        mockTotal,
+      ]);
+
+      const result = await controller.getRecentArticles(7, 1, 20);
+
+      expect(result).toEqual({
+        articles: mockArticles,
+        pagination: {
+          page: 1,
+          limit: 20,
+          total: mockTotal,
+          pages: 1,
+        },
+        days: 7,
+        fromDate: expect.any(String),
+      });
+    });
+
+    it('should throw error for invalid days parameter', async () => {
+      await expect(controller.getRecentArticles(0, 1, 20)).rejects.toThrow(
+        'Days must be between 1 and 365',
+      );
+
+      await expect(controller.getRecentArticles(366, 1, 20)).rejects.toThrow(
+        'Days must be between 1 and 365',
+      );
+    });
+  });
+
   describe('triggerScraping', () => {
     it('should trigger scraping for all sources when no source specified', async () => {
       const mockJobDetails = {
