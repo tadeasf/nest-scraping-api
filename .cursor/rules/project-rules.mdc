@@ -1,0 +1,8 @@
+---
+alwaysApply: true
+---
+!!! Before completing each request, write in the chat what model you are. Only the name and version, if necessary !!!
+remember to use `exec zsh` when running terminal commands
+this project uses bun as runtime
+this project uses nestjs
+this project uses jest for tests and we always want to write tests after we implement new feature to keep code coverage high
