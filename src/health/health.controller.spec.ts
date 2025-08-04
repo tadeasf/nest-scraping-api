@@ -99,6 +99,13 @@ describe('HealthController', () => {
 
       expect(result.scraping.lastRun).toBeNull();
     });
+
+    it('should handle database errors gracefully', async () => {
+      mockArticleRepository.count.mockRejectedValue(new Error('Database connection failed'));
+      mockScrapingService.getLastRunTime.mockReturnValue(null);
+
+      await expect(controller.getHealth()).rejects.toThrow('Database connection failed');
+    });
   });
 
   describe('getInfo', () => {
@@ -167,6 +174,13 @@ describe('HealthController', () => {
 
       expect(result.scheduled).toBe(false);
     });
+
+    it('should handle scraping service errors gracefully', async () => {
+      mockSchedulerRegistry.getCronJob.mockReturnValue({ name: 'scrapeAll' });
+      mockScrapingService.getScrapingStats.mockRejectedValue(new Error('Scraping service error'));
+
+      await expect(controller.getScrapingStatus()).rejects.toThrow('Scraping service error');
+    });
   });
 
   describe('getMetrics', () => {
@@ -199,6 +213,12 @@ describe('HealthController', () => {
       });
 
       expect(mockScrapingService.getScrapingStats).toHaveBeenCalled();
+    });
+
+    it('should handle scraping service errors gracefully', async () => {
+      mockScrapingService.getScrapingStats.mockRejectedValue(new Error('Metrics service error'));
+
+      await expect(controller.getMetrics()).rejects.toThrow('Metrics service error');
     });
   });
 });

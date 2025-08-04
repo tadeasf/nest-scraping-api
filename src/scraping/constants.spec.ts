@@ -50,5 +50,28 @@ describe('Constants', () => {
       const uniqueKeys = new Set(keys);
       expect(uniqueKeys.size).toBe(keys.length);
     });
+
+    it('should return immutable record', () => {
+      const sourcesRecord1 = getSourcesRecord();
+      const sourcesRecord2 = getSourcesRecord();
+
+      expect(sourcesRecord1).toEqual(sourcesRecord2);
+      expect(sourcesRecord1).not.toBe(sourcesRecord2); // Different objects
+    });
+
+    it('should contain all expected source types', () => {
+      const sourcesRecord = getSourcesRecord();
+
+      // Check that all sources from RSS_SOURCES are present in the record
+      RSS_SOURCES.forEach(source => {
+        expect(sourcesRecord[source.name]).toBeDefined();
+        expect(typeof sourcesRecord[source.name]).toBe('string');
+        expect(sourcesRecord[source.name]).toMatch(/^https?:\/\//);
+        expect(sourcesRecord[source.name]).toBe(source.url);
+      });
+
+      // Check that the number of sources matches
+      expect(Object.keys(sourcesRecord)).toHaveLength(RSS_SOURCES.length);
+    });
   });
 });

@@ -146,6 +146,56 @@ describe('ArticlesController', () => {
         { search: '%search%' },
       );
     });
+
+    it('should handle both source and search filters', async () => {
+      const mockArticles = [
+        {
+          id: 1,
+          title: 'Search Result',
+          url: 'http://example.com/1',
+          source: 'idnes.cz',
+        },
+      ];
+      const mockTotal = 1;
+
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        mockArticles,
+        mockTotal,
+      ]);
+
+      await controller.getArticles(1, 20, 'idnes.cz', 'search');
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'article.source = :source',
+        { source: 'idnes.cz' },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'article.title LIKE :search',
+        { search: '%search%' },
+      );
+    });
+
+    it('should handle database errors gracefully', async () => {
+      mockQueryBuilder.getManyAndCount.mockRejectedValue(new Error('Database error'));
+
+      await expect(controller.getArticles(1, 20)).rejects.toThrow('Database error');
+    });
+
+    it('should handle empty results', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      const result = await controller.getArticles(1, 20);
+
+      expect(result).toEqual({
+        articles: [],
+        pagination: {
+          page: 1,
+          limit: 20,
+          total: 0,
+          pages: 0,
+        },
+      });
+    });
   });
 
   describe('getSources', () => {
@@ -217,6 +267,12 @@ describe('ArticlesController', () => {
       await expect(controller.getArticle(999)).rejects.toThrow(
         'Article not found',
       );
+    });
+
+    it('should handle database errors gracefully', async () => {
+      mockArticleRepository.findOne.mockRejectedValue(new Error('Database connection failed'));
+
+      await expect(controller.getArticle(1)).rejects.toThrow('Database connection failed');
     });
   });
 
