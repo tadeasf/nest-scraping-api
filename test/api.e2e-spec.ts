@@ -3,7 +3,6 @@ import { INestApplication } from '@nestjs/common';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
 import { Article } from '../src/entities/article.entity';
 import * as fs from 'fs';
 import * as path from 'path';
