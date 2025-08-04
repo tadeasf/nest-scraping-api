@@ -301,7 +301,10 @@ describe('HealthController', () => {
       process.memoryUsage = jest.fn().mockReturnValue({
         heapUsed: 1024 * 1024 * 50, // 50MB
         heapTotal: 1024 * 1024 * 100, // 100MB
-      });
+        rss: 1024 * 1024 * 150, // 150MB
+        external: 1024 * 1024 * 10, // 10MB
+        arrayBuffers: 1024 * 1024 * 5, // 5MB
+      }) as any;
 
       const result = controller.getInfo();
 
@@ -318,7 +321,10 @@ describe('HealthController', () => {
       process.memoryUsage = jest.fn().mockReturnValue({
         heapUsed: 0,
         heapTotal: 0,
-      });
+        rss: 0,
+        external: 0,
+        arrayBuffers: 0,
+      }) as any;
 
       const result = controller.getInfo();
 

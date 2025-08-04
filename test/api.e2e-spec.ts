@@ -2,8 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as request from 'supertest';
-import { _AppModule } from '../src/app.module';
+import request from 'supertest';
+import { AppModule } from '../src/app.module';
 import { Article } from '../src/entities/article.entity';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -102,7 +102,7 @@ describe('API E2E Tests', () => {
         return request(app.getHttpServer())
           .get('/articles')
           .expect(200)
-          .expect((res) => {
+          .expect((res: any) => {
             expect(res.body.articles).toHaveLength(3);
             expect(res.body.pagination).toEqual({
               page: 1,
@@ -117,7 +117,7 @@ describe('API E2E Tests', () => {
         return request(app.getHttpServer())
           .get('/articles?source=idnes.cz')
           .expect(200)
-          .expect((res) => {
+          .expect((res: any) => {
             expect(res.body.articles).toHaveLength(2);
             expect(
               res.body.articles.every(
@@ -131,7 +131,7 @@ describe('API E2E Tests', () => {
         return request(app.getHttpServer())
           .get('/articles?search=Search Result')
           .expect(200)
-          .expect((res) => {
+          .expect((res: any) => {
             expect(res.body.articles).toHaveLength(1);
             expect(res.body.articles[0].title).toBe('Search Result Article');
           });
@@ -141,7 +141,7 @@ describe('API E2E Tests', () => {
         return request(app.getHttpServer())
           .get('/articles?source=idnes.cz&search=Test')
           .expect(200)
-          .expect((res) => {
+          .expect((res: any) => {
             expect(res.body.articles).toHaveLength(2);
             expect(
               res.body.articles.every(
@@ -160,7 +160,7 @@ describe('API E2E Tests', () => {
         return request(app.getHttpServer())
           .get('/articles?page=1&limit=2')
           .expect(200)
-          .expect((res) => {
+          .expect((res: any) => {
             expect(res.body.articles).toHaveLength(2);
             expect(res.body.pagination).toEqual({
               page: 1,
@@ -177,7 +177,7 @@ describe('API E2E Tests', () => {
         return request(app.getHttpServer())
           .get('/articles')
           .expect(200)
-          .expect((res) => {
+          .expect((res: any) => {
             expect(res.body.articles).toHaveLength(0);
             expect(res.body.pagination).toEqual({
               page: 1,
