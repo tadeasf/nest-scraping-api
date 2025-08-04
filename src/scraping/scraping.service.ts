@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Article } from '../entities/article.entity';
 import * as crypto from 'crypto';
+import { RSS_SOURCES, getSourcesRecord } from './constants';
 
 @Injectable()
 export class ScrapingService {
@@ -26,20 +27,8 @@ export class ScrapingService {
     this.logger.log('Starting hourly scraping...');
     this.lastRunTime = new Date();
 
-    const sources = [
-      { name: 'idnes.cz', url: 'http://servis.idnes.cz/rss.asp' },
-      { name: 'hn.cz-byznys', url: 'https://byznys.hn.cz/?m=rss' },
-      { name: 'hn.cz-domaci', url: 'https://domaci.hn.cz/?m=rss' },
-      { name: 'hn.cz-zahranicni', url: 'https://zahranicni.hn.cz/?m=rss' },
-      { name: 'hn.cz-nazory', url: 'https://nazory.hn.cz/?m=rss' },
-      { name: 'hn.cz-tech', url: 'https://tech.hn.cz/?m=rss' },
-      { name: 'aktualne.cz', url: 'https://www.aktualne.cz/rss/?BBX_DEVICE=desktop&BBX_REAL_DEVICE=desktop' },
-      { name: 'novinky.cz', url: 'https://www.novinky.cz/rss' },
-      { name: 'blesk.cz', url: 'https://www.blesk.cz/rss' },
-    ];
-
     // Scrape all sources concurrently
-    const scrapingPromises = sources.map(({ name, url }) =>
+    const scrapingPromises = RSS_SOURCES.map(({ name, url }) =>
       this.scrapeSource(name, url).catch(error => {
         this.logger.error(`Failed to scrape ${name}:`, error);
         return null;
@@ -54,17 +43,7 @@ export class ScrapingService {
     this.logger.log(`Scheduling immediate scraping${source ? ` for ${source}` : ' for all sources'}...`);
     this.lastRunTime = new Date();
 
-    const sources: Record<string, string> = {
-      'idnes.cz': 'http://servis.idnes.cz/rss.asp',
-      'hn.cz-byznys': 'https://byznys.hn.cz/?m=rss',
-      'hn.cz-domaci': 'https://domaci.hn.cz/?m=rss',
-      'hn.cz-zahranicni': 'https://zahranicni.hn.cz/?m=rss',
-      'hn.cz-nazory': 'https://nazory.hn.cz/?m=rss',
-      'hn.cz-tech': 'https://tech.hn.cz/?m=rss',
-      'aktualne.cz': 'https://www.aktualne.cz/rss/?BBX_DEVICE=desktop&BBX_REAL_DEVICE=desktop',
-      'novinky.cz': 'https://www.novinky.cz/rss',
-      'blesk.cz': 'https://www.blesk.cz/rss',
-    };
+    const sources = getSourcesRecord();
 
     // Validate source if provided
     if (source && !sources[source]) {
@@ -109,6 +88,12 @@ export class ScrapingService {
     this.logger.log(`Scraping ${source}...`);
     try {
       const feed = await this.parser.parseURL(url);
+
+      if (!feed || !feed.items) {
+        this.logger.warn(`No valid feed items found for ${source}`);
+        return;
+      }
+
       let newArticles = 0;
       for (const item of feed.items) {
         if (!item.title || !item.link) continue;
@@ -147,9 +132,8 @@ export class ScrapingService {
       }
       this.logger.log(`Found ${newArticles} new articles from ${source}.`);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to scrape ${source}`, errorMessage);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to scrape ${source}: ${errorMessage}`);
     }
   }
 

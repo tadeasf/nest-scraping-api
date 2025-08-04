@@ -11,11 +11,13 @@ describe('ArticlesController', () => {
   let _scrapingService: ScrapingService;
 
   const mockQueryBuilder = {
+    where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
     skip: jest.fn().mockReturnThis(),
     take: jest.fn().mockReturnThis(),
     getManyAndCount: jest.fn(),
+    getCount: jest.fn(),
     select: jest.fn().mockReturnThis(),
     addSelect: jest.fn().mockReturnThis(),
     groupBy: jest.fn().mockReturnThis(),
@@ -173,16 +175,15 @@ describe('ArticlesController', () => {
         { source: 'hn.cz', count: '5' },
       ];
 
-      mockArticleRepository.count
-        .mockResolvedValueOnce(mockTotalArticles)
-        .mockResolvedValueOnce(mockTodayArticles);
+      mockArticleRepository.count.mockResolvedValue(mockTotalArticles);
+      mockQueryBuilder.getCount.mockResolvedValue(mockTodayArticles);
       mockQueryBuilder.getRawMany.mockResolvedValue(mockArticlesBySource);
 
       const result = await controller.getStats();
 
       expect(result).toEqual({
         total: mockTotalArticles,
-        today: 0, // Updated to match the new implementation
+        today: mockTodayArticles,
         bySource: {
           'idnes.cz': 10,
           'hn.cz': 5,
