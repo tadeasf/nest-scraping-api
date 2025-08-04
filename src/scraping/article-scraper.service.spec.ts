@@ -78,4 +78,43 @@ describe('ArticleScraperService', () => {
       });
     });
   });
+
+  describe('concurrent scraping', () => {
+    it('should limit articles to 50 and scrape concurrently', async () => {
+      // Create more than 50 articles without content
+      const articles = Array.from({ length: 60 }, (_, i) => {
+        const article = new Article();
+        article.id = i + 1;
+        article.title = `Test Article ${i + 1}`;
+        article.url = `https://example.com/article-${i + 1}`;
+        article.source = 'test-source';
+        (article as any).content = null;
+        return article;
+      });
+
+      // Mock the repository to return only 50 articles (simulating the take: 50 limit)
+      jest.spyOn(mockRepository, 'find').mockResolvedValue(articles.slice(0, 50));
+
+      // Mock the scrapeArticleContent method to simulate successful scraping
+      const scrapeSpy = jest.spyOn(service as any, 'scrapeArticleContent').mockResolvedValue({
+        success: true,
+        content: 'Test content',
+        status: 'success',
+      });
+
+      // Mock the updateArticleScrapingStatus method
+      jest.spyOn(service as any, 'updateArticleScrapingStatus').mockResolvedValue(undefined);
+
+      await service.scrapeArticlesContent();
+
+      // Verify that only 50 articles were processed (due to the limit)
+      expect(scrapeSpy).toHaveBeenCalledTimes(50);
+
+      // Verify that the articles were processed in batches (concurrent processing)
+      // The semaphore should allow 5 concurrent requests
+      expect(scrapeSpy).toHaveBeenCalledWith(articles[0]);
+      expect(scrapeSpy).toHaveBeenCalledWith(articles[49]);
+      expect(scrapeSpy).not.toHaveBeenCalledWith(articles[50]); // Should not process article 51
+    });
+  });
 });

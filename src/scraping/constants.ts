@@ -278,12 +278,14 @@ export const PAYWALL_INDICATORS = [
   'premium',
   'předplatné',
   'předplatit',
-  'přihlásit se',
-  'registrovat',
   'subscribe',
   'membership',
   'exclusive',
   'výhradní',
+  'placený obsah',
+  'premium obsah',
+  'přístup pouze pro předplatitele',
+  'přihlášení vyžadováno pro čtení',
 ];
 
 // Generic content selectors for fallback content extraction

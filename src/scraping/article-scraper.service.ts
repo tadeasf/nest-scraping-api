@@ -17,25 +17,61 @@ interface ScrapingResult {
   error?: string;
 }
 
+// Simple semaphore for concurrency control
+class Semaphore {
+  private permits: number;
+  private waitQueue: Array<() => void> = [];
+
+  constructor(permits: number) {
+    this.permits = permits;
+  }
+
+  async acquire(): Promise<void> {
+    if (this.permits > 0) {
+      this.permits--;
+      return Promise.resolve();
+    }
+
+    return new Promise<void>((resolve) => {
+      this.waitQueue.push(resolve);
+    });
+  }
+
+  release(): void {
+    this.permits++;
+    if (this.waitQueue.length > 0) {
+      const next = this.waitQueue.shift();
+      if (next) {
+        this.permits--;
+        next();
+      }
+    }
+  }
+}
+
 @Injectable()
 export class ArticleScraperService {
   private readonly logger = new Logger(ArticleScraperService.name);
+  private readonly semaphore = new Semaphore(5); // Limit to 5 concurrent requests
 
   constructor(
     @InjectRepository(Article)
     private readonly _articleRepository: Repository<Article>,
-  ) {}
+  ) { }
 
   async scrapeArticlesContent(articles?: Article[]): Promise<void> {
     this.logger.log('Starting article content scraping...');
 
-    // If no articles provided, get all articles without content
+    // If no articles provided, get articles without content, limited to 50
     if (!articles) {
       articles = await this._articleRepository.find({
         where: { content: IsNull() },
         order: { createdAt: 'DESC' },
-        take: 50, // Limit to prevent overwhelming
+        take: 50, // Always limit to 50 articles
       });
+    } else {
+      // If articles are provided, still limit to 50
+      articles = articles.slice(0, 50);
     }
 
     if (articles.length === 0) {
@@ -45,51 +81,76 @@ export class ArticleScraperService {
 
     this.logger.log(`Found ${articles.length} articles to scrape content for`);
 
+    // Scrape articles concurrently with rate limiting
+    const scrapingPromises = articles.map((article) =>
+      this.scrapeArticleWithSemaphore(article),
+    );
+
+    const results = await Promise.allSettled(scrapingPromises);
+
+    // Count results
     let successCount = 0;
     let failCount = 0;
 
-    for (const article of articles) {
-      try {
-        const result = await this.scrapeArticleContent(article);
-
-        if (result.success) {
-          successCount++;
-          this.logger.log(`Successfully scraped content for: ${article.title}`);
-        } else {
-          failCount++;
-          this.logger.warn(
-            `Failed to scrape content for: ${article.title} - ${result.status}`,
-          );
-        }
-
-        // Add delay between requests to be respectful
-        const config = getSiteConfig(article.source);
-        if (config.delay) {
-          await this.delay(config.delay);
-        } else {
-          await this.delay(500); // Default delay
-        }
-      } catch (error) {
+    results.forEach((result) => {
+      if (result.status === 'fulfilled' && result.value.success) {
+        successCount++;
+      } else {
         failCount++;
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
-        this.logger.error(
-          `Error scraping content for ${article.title}: ${errorMessage}`,
-        );
-
-        // Update article with error status
-        await this.updateArticleScrapingStatus(
-          article.id,
-          'failed',
-          null,
-          errorMessage,
-        );
       }
-    }
+    });
 
     this.logger.log(
       `Article content scraping completed. Success: ${successCount}, Failed: ${failCount}`,
     );
+  }
+
+  private async scrapeArticleWithSemaphore(article: Article): Promise<ScrapingResult> {
+    await this.semaphore.acquire();
+
+    try {
+      const result = await this.scrapeArticleContent(article);
+
+      if (result.success) {
+        this.logger.log(`Successfully scraped content for: ${article.title}`);
+      } else {
+        this.logger.warn(
+          `Failed to scrape content for: ${article.title} - ${result.status}`,
+        );
+      }
+
+      // Add delay between requests to be respectful
+      const config = getSiteConfig(article.source);
+      if (config.delay) {
+        await this.delay(config.delay);
+      } else {
+        await this.delay(500); // Default delay
+      }
+
+      return result;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Error scraping content for ${article.title}: ${errorMessage}`,
+      );
+
+      // Update article with error status
+      await this.updateArticleScrapingStatus(
+        article.id,
+        'failed',
+        null,
+        errorMessage,
+      );
+
+      return {
+        success: false,
+        status: 'error',
+        error: errorMessage,
+      };
+    } finally {
+      this.semaphore.release();
+    }
   }
 
   private async scrapeArticleContent(
