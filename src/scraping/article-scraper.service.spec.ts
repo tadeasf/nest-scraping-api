@@ -61,6 +61,7 @@ describe('ArticleScraperService', () => {
           { status: 'success', count: '50' },
           { status: 'failed', count: '10' },
           { status: 'paywall', count: '5' },
+          { status: 'paywall_skipped', count: '3' },
         ]),
       } as any);
 
@@ -74,8 +75,24 @@ describe('ArticleScraperService', () => {
           success: 50,
           failed: 10,
           paywall: 5,
+          paywall_skipped: 3,
         },
       });
+    });
+  });
+
+  describe('known paywall sources', () => {
+    it('should identify known paywall sources correctly', () => {
+      // Test the private method directly
+      const isKnownPaywallSource = (service as any).isKnownPaywallSource.bind(
+        service,
+      );
+
+      expect(isKnownPaywallSource('echo24.cz')).toBe(true);
+      expect(isKnownPaywallSource('hn.cz')).toBe(true);
+      expect(isKnownPaywallSource('hn.cz-byznys')).toBe(true);
+      expect(isKnownPaywallSource('idnes.cz')).toBe(false);
+      expect(isKnownPaywallSource('aktualne.cz')).toBe(false);
     });
   });
 
@@ -100,15 +117,12 @@ describe('ArticleScraperService', () => {
         .mockResolvedValueOnce(articles.slice(100, 120)) // Third batch (less than 50)
         .mockResolvedValueOnce([]); // No more articles
 
-      // Mock axios to return successful responses
-      const axios = require('axios');
-      jest.spyOn(axios, 'get').mockResolvedValue({
-        status: 200,
-        data: '<html><body><div class="article-content"><p>Test content</p></div></body></html>',
+      // Mock the scrapeArticleWithSemaphore method
+      jest.spyOn(service as any, 'scrapeArticleWithSemaphore').mockResolvedValue({
+        success: true,
+        content: 'Test content',
+        status: 'success',
       });
-
-      // Mock the updateArticleScrapingStatus method
-      jest.spyOn(service as any, 'updateArticleScrapingStatus').mockResolvedValue(undefined);
 
       // Mock the delay function to make tests faster
       jest.spyOn(service as any, 'delay').mockResolvedValue(undefined);
@@ -118,8 +132,8 @@ describe('ArticleScraperService', () => {
       // Verify that the repository was called multiple times for different batches
       expect(findSpy).toHaveBeenCalledTimes(3); // 3 batches (stops when batch < 50)
 
-      // Verify that axios was called for articles (indicating scraping was attempted)
-      expect(axios.get).toHaveBeenCalled();
+      // Verify that scrapeArticleWithSemaphore was called for articles
+      expect((service as any).scrapeArticleWithSemaphore).toHaveBeenCalled();
     });
 
     it('should limit provided articles to 50', async () => {
@@ -134,23 +148,20 @@ describe('ArticleScraperService', () => {
         return article;
       });
 
-      // Mock axios to return successful responses
-      const axios = require('axios');
-      jest.spyOn(axios, 'get').mockResolvedValue({
-        status: 200,
-        data: '<html><body><div class="article-content"><p>Test content</p></div></body></html>',
+      // Mock the scrapeArticleWithSemaphore method
+      jest.spyOn(service as any, 'scrapeArticleWithSemaphore').mockResolvedValue({
+        success: true,
+        content: 'Test content',
+        status: 'success',
       });
-
-      // Mock the updateArticleScrapingStatus method
-      jest.spyOn(service as any, 'updateArticleScrapingStatus').mockResolvedValue(undefined);
 
       // Mock the delay function to make tests faster
       jest.spyOn(service as any, 'delay').mockResolvedValue(undefined);
 
       await service.scrapeArticlesContent(articles);
 
-      // Verify that axios was called (indicating scraping was attempted)
-      expect(axios.get).toHaveBeenCalled();
+      // Verify that scrapeArticleWithSemaphore was called for articles (limited to 50)
+      expect((service as any).scrapeArticleWithSemaphore).toHaveBeenCalledTimes(50);
     });
   });
 });

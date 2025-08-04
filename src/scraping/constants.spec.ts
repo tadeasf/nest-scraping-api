@@ -1,4 +1,8 @@
-import { RSS_SOURCES, getSourcesRecord } from './constants';
+import {
+  RSS_SOURCES,
+  getSourcesRecord,
+  KNOWN_PAYWALL_SOURCES,
+} from './constants';
 
 describe('Constants', () => {
   describe('RSS_SOURCES', () => {
@@ -72,6 +76,35 @@ describe('Constants', () => {
 
       // Check that the number of sources matches
       expect(Object.keys(sourcesRecord)).toHaveLength(RSS_SOURCES.length);
+    });
+  });
+
+  describe('KNOWN_PAYWALL_SOURCES', () => {
+    it('should contain known paywall sources', () => {
+      expect(KNOWN_PAYWALL_SOURCES).toBeDefined();
+      expect(Array.isArray(KNOWN_PAYWALL_SOURCES)).toBe(true);
+      expect(KNOWN_PAYWALL_SOURCES.length).toBeGreaterThan(0);
+    });
+
+    it('should contain expected paywall sources', () => {
+      expect(KNOWN_PAYWALL_SOURCES).toContain('echo24.cz');
+      expect(KNOWN_PAYWALL_SOURCES).toContain('hn.cz');
+      expect(KNOWN_PAYWALL_SOURCES).toContain('hn.cz-byznys');
+      expect(KNOWN_PAYWALL_SOURCES).toContain('hn.cz-domaci');
+      expect(KNOWN_PAYWALL_SOURCES).toContain('hn.cz-zahranicni');
+      expect(KNOWN_PAYWALL_SOURCES).toContain('hn.cz-nazory');
+      expect(KNOWN_PAYWALL_SOURCES).toContain('hn.cz-tech');
+    });
+
+    it('should have unique source names', () => {
+      const uniqueSources = new Set(KNOWN_PAYWALL_SOURCES);
+      expect(uniqueSources.size).toBe(KNOWN_PAYWALL_SOURCES.length);
+    });
+
+    it('should not contain non-paywall sources', () => {
+      expect(KNOWN_PAYWALL_SOURCES).not.toContain('idnes.cz');
+      expect(KNOWN_PAYWALL_SOURCES).not.toContain('aktualne.cz');
+      expect(KNOWN_PAYWALL_SOURCES).not.toContain('novinky.cz');
     });
   });
 });

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import { INestApplication } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { Repository } from 'typeorm/repository/Repository';
 import { ArticlesController } from './articles.controller';
 import { ScrapingService } from '../scraping/scraping.service';
 import { ArticleScraperService } from '../scraping/article-scraper.service';
@@ -28,8 +28,8 @@ describe('ArticlesController Integration', () => {
   let module: TestingModule;
 
   beforeAll(async () => {
-    // Create a temporary SQLite database for testing
-    const testDbPath = path.join(__dirname, '../../../test-articles-db.sqlite');
+    // Create a temporary SQLite database for testing in /tmp directory
+    const testDbPath = path.join('/tmp', 'test-articles-db.sqlite');
 
     // Clean up any existing test database
     if (fs.existsSync(testDbPath)) {
@@ -44,6 +44,7 @@ describe('ArticlesController Integration', () => {
           entities: [Article],
           synchronize: true,
           dropSchema: true,
+          logging: false, // Disable logging to reduce noise
         }),
         TypeOrmModule.forFeature([Article]),
       ],
@@ -81,13 +82,16 @@ describe('ArticlesController Integration', () => {
         withoutContent: 0,
         byStatus: {},
       });
+
+    // Ensure database is properly initialized
+    await new Promise((resolve) => setTimeout(resolve, 100));
   });
 
   afterAll(async () => {
     await app.close();
 
     // Clean up test database
-    const testDbPath = path.join(__dirname, '../../../test-articles-db.sqlite');
+    const testDbPath = path.join('/tmp', 'test-articles-db.sqlite');
     if (fs.existsSync(testDbPath)) {
       fs.unlinkSync(testDbPath);
     }
@@ -154,7 +158,7 @@ describe('ArticlesController Integration', () => {
 
       expect(result.articles).toHaveLength(2);
       expect(
-        result.articles.every((article) => article.source === 'idnes.cz'),
+        result.articles.every((article: any) => article.source === 'idnes.cz'),
       ).toBe(true);
     });
 
@@ -175,10 +179,10 @@ describe('ArticlesController Integration', () => {
 
       expect(result.articles).toHaveLength(1);
       expect(
-        result.articles.every((article) => article.source === 'idnes.cz'),
+        result.articles.every((article: any) => article.source === 'idnes.cz'),
       ).toBe(true);
       expect(
-        result.articles.every((article) => article.title.includes('Test')),
+        result.articles.every((article: any) => article.title.includes('Test')),
       ).toBe(true);
     });
 
@@ -451,7 +455,7 @@ describe('ArticlesController Integration', () => {
 
       expect(result.articles).toHaveLength(2);
       expect(
-        result.articles.every((article) => article.source === 'idnes.cz'),
+        result.articles.every((article: any) => article.source === 'idnes.cz'),
       ).toBe(true);
       expect(result.pagination).toEqual({
         page: 1,
@@ -562,37 +566,42 @@ describe('ArticlesController Integration', () => {
 
   describe('getRecentArticles', () => {
     beforeEach(async () => {
-      // Create test articles with different dates
-      const now = new Date();
-      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const _twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-      const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
+      try {
+        // Create test articles with different dates
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const _twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+        const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
 
-      const testArticles = [
-        {
-          title: 'Recent Article 1',
-          url: 'https://example.com/recent1',
-          contentHash: 'hash1',
-          source: 'idnes.cz',
-          createdAt: now,
-        },
-        {
-          title: 'Recent Article 2',
-          url: 'https://example.com/recent2',
-          contentHash: 'hash2',
-          source: 'hn.cz',
-          createdAt: oneDayAgo,
-        },
-        {
-          title: 'Old Article',
-          url: 'https://example.com/old',
-          contentHash: 'hash3',
-          source: 'aktualne.cz',
-          createdAt: tenDaysAgo,
-        },
-      ];
+        const testArticles = [
+          {
+            title: 'Recent Article 1',
+            url: 'https://example.com/recent1',
+            contentHash: 'hash1',
+            source: 'idnes.cz',
+            createdAt: now,
+          },
+          {
+            title: 'Recent Article 2',
+            url: 'https://example.com/recent2',
+            contentHash: 'hash2',
+            source: 'hn.cz',
+            createdAt: oneDayAgo,
+          },
+          {
+            title: 'Old Article',
+            url: 'https://example.com/old',
+            contentHash: 'hash3',
+            source: 'aktualne.cz',
+            createdAt: tenDaysAgo,
+          },
+        ];
 
-      await articleRepository.save(testArticles);
+        await articleRepository.save(testArticles);
+      } catch (error) {
+        console.error('Error setting up test data:', error);
+        throw error;
+      }
     });
 
     it('should return recent articles', async () => {

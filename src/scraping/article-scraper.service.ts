@@ -8,8 +8,8 @@ import {
   getSiteConfig,
   PAYWALL_INDICATORS,
   GENERIC_CONTENT_SELECTORS,
+  KNOWN_PAYWALL_SOURCES,
 } from './constants';
-
 
 interface ScrapingResult {
   success: boolean;
@@ -58,7 +58,7 @@ export class ArticleScraperService {
   constructor(
     @InjectRepository(Article)
     private readonly _articleRepository: Repository<Article>,
-  ) { }
+  ) {}
 
   async scrapeArticlesContent(articles?: Article[]): Promise<void> {
     this.logger.log('Starting article content scraping...');
@@ -90,13 +90,16 @@ export class ArticleScraperService {
           break;
         }
 
-        this.logger.log(`Processing batch ${batchNumber}: ${batchArticles.length} articles`);
+        this.logger.log(
+          `Processing batch ${batchNumber}: ${batchArticles.length} articles`,
+        );
 
-        const results = await this.processArticleBatch(batchArticles, batchNumber);
+        const results = await this.processArticleBatch(
+          batchArticles,
+          batchNumber,
+        );
         totalSuccessCount += results.successCount;
         totalFailCount += results.failCount;
-
-
 
         // If we got less than 50 articles, we've processed all available articles
         if (batchArticles.length < 50) {
@@ -110,13 +113,21 @@ export class ArticleScraperService {
     );
 
     if (totalSuccessCount + totalFailCount > 0) {
-      const overallSuccessRate = ((totalSuccessCount / (totalSuccessCount + totalFailCount)) * 100).toFixed(1);
+      const overallSuccessRate = (
+        (totalSuccessCount / (totalSuccessCount + totalFailCount)) *
+        100
+      ).toFixed(1);
       this.logger.log(`Overall success rate: ${overallSuccessRate}%`);
     }
   }
 
-  private async processArticleBatch(articles: Article[], batchNumber: number): Promise<{ successCount: number; failCount: number }> {
-    this.logger.log(`Found ${articles.length} articles to scrape content for in batch ${batchNumber}`);
+  private async processArticleBatch(
+    articles: Article[],
+    batchNumber: number,
+  ): Promise<{ successCount: number; failCount: number }> {
+    this.logger.log(
+      `Found ${articles.length} articles to scrape content for in batch ${batchNumber}`,
+    );
 
     // Scrape articles concurrently with rate limiting
     const scrapingPromises = articles.map((article) =>
@@ -164,14 +175,18 @@ export class ArticleScraperService {
     return { successCount, failCount };
   }
 
-  private async scrapeArticleWithSemaphore(article: Article): Promise<ScrapingResult> {
+  private async scrapeArticleWithSemaphore(
+    article: Article,
+  ): Promise<ScrapingResult> {
     await this.semaphore.acquire();
 
     try {
       const result = await this.scrapeArticleContent(article);
 
       if (result.success) {
-        this.logger.log(`Successfully scraped content for [${article.source}]: ${article.title}`);
+        this.logger.log(
+          `Successfully scraped content for [${article.source}]: ${article.title}`,
+        );
       } else {
         this.logger.warn(
           `Failed to scrape content for [${article.source}]: ${article.title} - ${result.status}`,
@@ -212,9 +227,32 @@ export class ArticleScraperService {
     }
   }
 
+  private isKnownPaywallSource(source: string): boolean {
+    return KNOWN_PAYWALL_SOURCES.includes(source);
+  }
+
   private async scrapeArticleContent(
     article: Article,
   ): Promise<ScrapingResult> {
+    // Check if this is a known paywall source and skip it
+    if (this.isKnownPaywallSource(article.source)) {
+      this.logger.log(`Skipping known paywall source: ${article.source}`);
+
+      // Update article status to indicate it was skipped due to paywall
+      await this.updateArticleScrapingStatus(
+        article.id,
+        'paywall_skipped',
+        null,
+        'Known paywall source - auto-skipped',
+      );
+
+      return {
+        success: false,
+        status: 'paywall_skipped',
+        error: 'Known paywall source - auto-skipped',
+      };
+    }
+
     try {
       const config = getSiteConfig(article.source);
 
@@ -326,8 +364,6 @@ export class ArticleScraperService {
         }
       }
 
-
-
       return {
         success: false,
         status: 'error',
@@ -370,7 +406,7 @@ export class ArticleScraperService {
     const paragraphs = $('p')
       .map((_, el) => $(el).text().trim())
       .get()
-      .filter(text => text.length > 10); // Filter out very short paragraphs
+      .filter((text) => text.length > 10); // Filter out very short paragraphs
     return paragraphs.join('\n\n');
   }
 

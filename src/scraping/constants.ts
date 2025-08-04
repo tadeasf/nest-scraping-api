@@ -81,7 +81,13 @@ export const SITE_CONFIGS: Record<string, SiteConfig> = {
       '.article p',
       'p',
     ],
-    removeSelectors: ['.advertisement', '.social-share', '.comments', '.ad', '.banner'],
+    removeSelectors: [
+      '.advertisement',
+      '.social-share',
+      '.comments',
+      '.ad',
+      '.banner',
+    ],
     delay: 1000,
   },
   'hn.cz': {
@@ -313,7 +319,13 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
     'article p',
     'p',
   ],
-  removeSelectors: ['.advertisement', '.social-share', '.comments', '.ad', '.banner'],
+  removeSelectors: [
+    '.advertisement',
+    '.social-share',
+    '.comments',
+    '.ad',
+    '.banner',
+  ],
   delay: 1000,
 };
 
@@ -345,6 +357,28 @@ export const GENERIC_CONTENT_SELECTORS = [
   '.article',
   '.post',
   '.entry',
+];
+
+// Known paywall sources that should be auto-skipped during scraping
+// This saves time and resources by not attempting to scrape these sources
+//
+// Benefits:
+// - Reduces unnecessary HTTP requests to known paywall sites
+// - Improves scraping performance and reduces server load
+// - Prevents wasting resources on content that cannot be accessed
+// - Provides clear status tracking for skipped articles
+//
+// Current paywall sources:
+// - echo24.cz: Complete paywall
+// - hn.cz and all hn.cz-* variants: Complete paywall (ihned.cz)
+export const KNOWN_PAYWALL_SOURCES = [
+  'echo24.cz',
+  'hn.cz',
+  'hn.cz-byznys',
+  'hn.cz-domaci',
+  'hn.cz-zahranicni',
+  'hn.cz-nazory',
+  'hn.cz-tech',
 ];
 
 // Helper function to get sources as a Record for validation
