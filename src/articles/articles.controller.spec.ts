@@ -360,38 +360,62 @@ describe('ArticlesController', () => {
 
       const result = await controller.triggerScraping();
 
-      expect(_scrapingService.scrapeImmediately).toHaveBeenCalledWith(
-        undefined,
-      );
       expect(result).toEqual({
         success: true,
         ...mockJobDetails,
         timestamp: expect.any(String),
       });
+      expect(_scrapingService.scrapeImmediately).toHaveBeenCalledWith(
+        undefined,
+      );
     });
 
     it('should trigger scraping for specific source', async () => {
       const mockJobDetails = {
         jobId: 'scrape_1234567890',
         status: 'scheduled',
-        source: 'novinky.cz',
+        source: 'idnes.cz',
         scheduledAt: new Date(),
-        message: 'Scraping scheduled for novinky.cz',
+        message: 'Scraping scheduled for idnes.cz',
       };
       (_scrapingService.scrapeImmediately as jest.Mock).mockResolvedValue(
         mockJobDetails,
       );
 
-      const result = await controller.triggerScraping('novinky.cz');
+      const result = await controller.triggerScraping('idnes.cz');
 
-      expect(_scrapingService.scrapeImmediately).toHaveBeenCalledWith(
-        'novinky.cz',
-      );
       expect(result).toEqual({
         success: true,
         ...mockJobDetails,
         timestamp: expect.any(String),
       });
+      expect(_scrapingService.scrapeImmediately).toHaveBeenCalledWith(
+        'idnes.cz',
+      );
+    });
+
+    it('should handle invalid source error', async () => {
+      const errorMessage =
+        'Invalid source: invalid-source. Valid sources are: idnes.cz, hn.cz';
+      (_scrapingService.scrapeImmediately as jest.Mock).mockRejectedValue(
+        new Error(errorMessage),
+      );
+
+      await expect(
+        controller.triggerScraping('invalid-source'),
+      ).rejects.toThrow(
+        'Invalid source: invalid-source. Valid sources are: idnes.cz, hn.cz',
+      );
+    });
+
+    it('should handle generic scraping errors', async () => {
+      (_scrapingService.scrapeImmediately as jest.Mock).mockRejectedValue(
+        new Error('Network error'),
+      );
+
+      await expect(controller.triggerScraping()).rejects.toThrow(
+        'Failed to trigger scraping',
+      );
     });
   });
 });
