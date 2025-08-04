@@ -114,8 +114,11 @@ describe('ScrapingService', () => {
     });
 
     it('should handle scraping errors gracefully', async () => {
-      // Mock the repository to simulate errors
-      mockRepository.findOne.mockRejectedValue(new Error('Database error'));
+      // Mock the parser to simulate RSS parsing errors
+      const mockParser = {
+        parseURL: jest.fn().mockRejectedValue(new Error('Network error')),
+      };
+      (service as any).parser = mockParser;
 
       // This should not throw an error
       await expect(service.scrapeAll()).resolves.not.toThrow();
@@ -128,6 +131,103 @@ describe('ScrapingService', () => {
       // by calling scrapeImmediately and checking that errors are handled
       const result = await service.scrapeImmediately('idnes.cz');
       expect(result.status).toBe('scheduled');
+    });
+
+    it('should handle successful RSS parsing', async () => {
+      // Mock the parser to return a valid feed
+      const mockFeed = {
+        items: [
+          {
+            title: 'Test Article',
+            link: 'https://example.com/article',
+            content: '<p>Test content</p>',
+            creator: 'Test Author',
+            pubDate: '2024-01-01T00:00:00Z',
+          },
+        ],
+      };
+      const mockParser = {
+        parseURL: jest.fn().mockResolvedValue(mockFeed),
+      };
+      (service as any).parser = mockParser;
+
+      // Mock repository to return null (no existing article)
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.save.mockResolvedValue({} as any);
+
+      // Call the private method directly
+      await service['scrapeSource']('test-source', 'https://example.com/rss');
+
+      expect(mockParser.parseURL).toHaveBeenCalledWith(
+        'https://example.com/rss',
+      );
+      expect(mockRepository.findOne).toHaveBeenCalled();
+      expect(mockRepository.save).toHaveBeenCalled();
+    });
+
+    it('should handle feed with no items', async () => {
+      const mockFeed = { items: [] };
+      const mockParser = {
+        parseURL: jest.fn().mockResolvedValue(mockFeed),
+      };
+      (service as any).parser = mockParser;
+
+      await service['scrapeSource']('test-source', 'https://example.com/rss');
+
+      expect(mockParser.parseURL).toHaveBeenCalledWith(
+        'https://example.com/rss',
+      );
+      expect(mockRepository.findOne).not.toHaveBeenCalled();
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should handle items without title or link', async () => {
+      const mockFeed = {
+        items: [
+          { content: 'No title or link' },
+          { title: 'No link', content: 'Test content' },
+          { link: 'https://example.com', content: 'No title' },
+        ],
+      };
+      const mockParser = {
+        parseURL: jest.fn().mockResolvedValue(mockFeed),
+      };
+      (service as any).parser = mockParser;
+
+      await service['scrapeSource']('test-source', 'https://example.com/rss');
+
+      expect(mockParser.parseURL).toHaveBeenCalledWith(
+        'https://example.com/rss',
+      );
+      expect(mockRepository.findOne).not.toHaveBeenCalled();
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should handle existing articles', async () => {
+      const mockFeed = {
+        items: [
+          {
+            title: 'Existing Article',
+            link: 'https://example.com/article',
+            content: 'Test content',
+          },
+        ],
+      };
+      const mockParser = {
+        parseURL: jest.fn().mockResolvedValue(mockFeed),
+      };
+      (service as any).parser = mockParser;
+
+      // Mock repository to return existing article
+      mockRepository.findOne.mockResolvedValue({ id: 1 } as any);
+
+      await service['scrapeSource']('test-source', 'https://example.com/rss');
+
+      expect(mockParser.parseURL).toHaveBeenCalledWith(
+        'https://example.com/rss',
+      );
+      expect(mockRepository.findOne).toHaveBeenCalled();
+      expect(mockRepository.save).not.toHaveBeenCalled();
     });
   });
 
