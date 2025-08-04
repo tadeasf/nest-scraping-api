@@ -1,6 +1,12 @@
 # NestJS Scraping API
 
+[![codecov](https://codecov.io/github/tadeasf/nest-scraping-api/graph/badge.svg?token=duBUQsNoBr)](https://codecov.io/github/tadeasf/nest-scraping-api)
+
 A robust NestJS application for scraping news articles from popular Czech news websites. Built with enterprise-grade logging, comprehensive testing, and automated CI/CD pipeline.
+
+## 📊 Code Coverage
+
+![Code Coverage Sunburst](https://codecov.io/github/tadeasf/nest-scraping-api/graphs/sunburst.svg?token=duBUQsNoBr)
 
 ## 🚀 Features
 
@@ -120,10 +126,20 @@ The project maintains a minimum code coverage threshold of 80% for:
 - Lines
 - Statements
 
+**Current Coverage: 83.33%**
+
 Coverage reports are generated in multiple formats:
 - HTML: `coverage/index.html`
 - LCOV: `coverage/lcov.info`
 - Console output
+
+### Coverage Breakdown
+- **Statements**: 91.02%
+- **Branches**: 77.09%
+- **Functions**: 87.5%
+- **Lines**: 91.07%
+
+The project uses [Codecov](https://codecov.io/github/tadeasf/nest-scraping-api) for continuous coverage monitoring and reporting.
 
 ## 🔧 Configuration
 
@@ -199,7 +215,7 @@ The project includes a comprehensive GitHub Actions workflow that runs on every 
 
 ### Features
 - Automated testing with Jest
-- Code coverage reporting to Codecov
+- Code coverage reporting to [Codecov](https://codecov.io/github/tadeasf/nest-scraping-api)
 - Security scanning with Snyk
 - Dependency vulnerability checks
 - Automated builds and deployments
