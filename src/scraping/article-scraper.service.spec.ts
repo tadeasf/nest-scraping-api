@@ -118,11 +118,13 @@ describe('ArticleScraperService', () => {
         .mockResolvedValueOnce([]); // No more articles
 
       // Mock the scrapeArticleWithSemaphore method
-      jest.spyOn(service as any, 'scrapeArticleWithSemaphore').mockResolvedValue({
-        success: true,
-        content: 'Test content',
-        status: 'success',
-      });
+      jest
+        .spyOn(service as any, 'scrapeArticleWithSemaphore')
+        .mockResolvedValue({
+          success: true,
+          content: 'Test content',
+          status: 'success',
+        });
 
       // Mock the delay function to make tests faster
       jest.spyOn(service as any, 'delay').mockResolvedValue(undefined);
@@ -149,11 +151,13 @@ describe('ArticleScraperService', () => {
       });
 
       // Mock the scrapeArticleWithSemaphore method
-      jest.spyOn(service as any, 'scrapeArticleWithSemaphore').mockResolvedValue({
-        success: true,
-        content: 'Test content',
-        status: 'success',
-      });
+      jest
+        .spyOn(service as any, 'scrapeArticleWithSemaphore')
+        .mockResolvedValue({
+          success: true,
+          content: 'Test content',
+          status: 'success',
+        });
 
       // Mock the delay function to make tests faster
       jest.spyOn(service as any, 'delay').mockResolvedValue(undefined);
@@ -161,7 +165,9 @@ describe('ArticleScraperService', () => {
       await service.scrapeArticlesContent(articles);
 
       // Verify that scrapeArticleWithSemaphore was called for articles (limited to 50)
-      expect((service as any).scrapeArticleWithSemaphore).toHaveBeenCalledTimes(50);
+      expect((service as any).scrapeArticleWithSemaphore).toHaveBeenCalledTimes(
+        50,
+      );
     });
   });
 });

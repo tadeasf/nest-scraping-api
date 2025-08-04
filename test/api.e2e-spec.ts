@@ -279,9 +279,7 @@ describe('API E2E Tests', () => {
       });
 
       it('should handle invalid ID parameter', async () => {
-        await request(app.getHttpServer())
-          .get('/articles/invalid')
-          .expect(400);
+        await request(app.getHttpServer()).get('/articles/invalid').expect(400);
       });
     });
 
@@ -368,9 +366,9 @@ describe('API E2E Tests', () => {
           },
         ];
 
-        const articleRepository = module.get('ArticleRepository');
-        if (articleRepository) {
-          await articleRepository.save(testArticles);
+        const repo = module.get('ArticleRepository');
+        if (repo) {
+          await repo.save(testArticles);
         }
       });
 
@@ -415,9 +413,9 @@ describe('API E2E Tests', () => {
     describe('GET /articles/recent/:days', () => {
       beforeEach(async () => {
         // Create articles with different dates
-        const articleRepository = module.get('ArticleRepository');
-        if (articleRepository) {
-          await articleRepository.clear();
+        const repo = module.get('ArticleRepository');
+        if (repo) {
+          await repo.clear();
         }
         const now = new Date();
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -447,9 +445,9 @@ describe('API E2E Tests', () => {
           },
         ];
 
-        const articleRepository = module.get('ArticleRepository');
-        if (articleRepository) {
-          await articleRepository.save(testArticles);
+        const repo2 = module.get('ArticleRepository');
+        if (repo2) {
+          await repo2.save(testArticles);
         }
       });
 
@@ -609,9 +607,7 @@ describe('API E2E Tests', () => {
 
   describe('Error Handling', () => {
     it('should handle 404 for non-existent routes', async () => {
-      await request(app.getHttpServer())
-        .get('/non-existent-route')
-        .expect(404);
+      await request(app.getHttpServer()).get('/non-existent-route').expect(404);
     });
   });
 });
