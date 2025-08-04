@@ -33,7 +33,7 @@ export class ScrapingService {
       { name: 'hn.cz-zahranicni', url: 'https://zahranicni.hn.cz/?m=rss' },
       { name: 'hn.cz-nazory', url: 'https://nazory.hn.cz/?m=rss' },
       { name: 'hn.cz-tech', url: 'https://tech.hn.cz/?m=rss' },
-      { name: 'aktualne.cz', url: 'https://www.aktualne.cz/export-rss/r~b:article:rss/' },
+      { name: 'aktualne.cz', url: 'https://www.aktualne.cz/rss/?BBX_DEVICE=desktop&BBX_REAL_DEVICE=desktop' },
       { name: 'novinky.cz', url: 'https://www.novinky.cz/rss' },
       { name: 'blesk.cz', url: 'https://www.blesk.cz/rss' },
     ];
@@ -61,7 +61,7 @@ export class ScrapingService {
       'hn.cz-zahranicni': 'https://zahranicni.hn.cz/?m=rss',
       'hn.cz-nazory': 'https://nazory.hn.cz/?m=rss',
       'hn.cz-tech': 'https://tech.hn.cz/?m=rss',
-      'aktualne.cz': 'https://www.aktualne.cz/export-rss/r~b:article:rss/',
+      'aktualne.cz': 'https://www.aktualne.cz/rss/?BBX_DEVICE=desktop&BBX_REAL_DEVICE=desktop',
       'novinky.cz': 'https://www.novinky.cz/rss',
       'blesk.cz': 'https://www.blesk.cz/rss',
     };
