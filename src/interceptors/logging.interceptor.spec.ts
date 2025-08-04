@@ -15,4 +15,4 @@ describe('LoggingInterceptor', () => {
   it('should be defined', () => {
     expect(interceptor).toBeDefined();
   });
-}); 
+});
