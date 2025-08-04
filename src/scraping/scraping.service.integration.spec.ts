@@ -7,6 +7,16 @@ import { Repository } from 'typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Suppress console.error during tests to reduce noise
+const originalConsoleError = console.error;
+beforeAll(() => {
+    console.error = jest.fn();
+});
+
+afterAll(() => {
+    console.error = originalConsoleError;
+});
+
 describe('ScrapingService Integration', () => {
     let service: ScrapingService;
     let articleRepository: Repository<Article>;
@@ -37,6 +47,12 @@ describe('ScrapingService Integration', () => {
 
         service = module.get<ScrapingService>(ScrapingService);
         articleRepository = module.get<Repository<Article>>(getRepositoryToken(Article));
+
+        // Mock the RSS parser to prevent real network requests
+        const mockParser = {
+            parseURL: jest.fn().mockResolvedValue({ items: [] }),
+        };
+        (service as any).parser = mockParser;
     });
 
     afterAll(async () => {

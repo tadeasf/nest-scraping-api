@@ -9,6 +9,16 @@ import { Article } from '../entities/article.entity';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Suppress console.error during tests to reduce noise
+const originalConsoleError = console.error;
+beforeAll(() => {
+    console.error = jest.fn();
+});
+
+afterAll(() => {
+    console.error = originalConsoleError;
+});
+
 describe('ArticlesController Integration', () => {
     let app: INestApplication;
     let controller: ArticlesController;
@@ -46,6 +56,12 @@ describe('ArticlesController Integration', () => {
         controller = module.get<ArticlesController>(ArticlesController);
         articleRepository = module.get<Repository<Article>>(getRepositoryToken(Article));
         scrapingService = module.get<ScrapingService>(ScrapingService);
+
+        // Mock the RSS parser to prevent real network requests
+        const mockParser = {
+            parseURL: jest.fn().mockResolvedValue({ items: [] }),
+        };
+        (scrapingService as any).parser = mockParser;
     });
 
     afterAll(async () => {

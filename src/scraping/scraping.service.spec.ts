@@ -5,6 +5,27 @@ import { ScrapingService } from './scraping.service';
 import { Article } from '../entities/article.entity';
 import { getSourcesRecord } from './constants';
 
+// Mock the constants module to prevent real RSS requests
+jest.mock('./constants', () => ({
+  RSS_SOURCES: [
+    { name: 'test-source', url: 'https://example.com/test-rss' },
+  ],
+  getSourcesRecord: () => ({
+    'test-source': 'https://example.com/test-rss',
+  }),
+}));
+
+// Mock the Logger to suppress error messages during tests
+// Suppress console.error during tests to reduce noise
+const originalConsoleError = console.error;
+beforeAll(() => {
+  console.error = jest.fn();
+});
+
+afterAll(() => {
+  console.error = originalConsoleError;
+});
+
 describe('ScrapingService', () => {
   let service: ScrapingService;
   let mockRepository: jest.Mocked<Repository<Article>>;
@@ -32,6 +53,12 @@ describe('ScrapingService', () => {
 
     service = module.get<ScrapingService>(ScrapingService);
     mockRepository = module.get(getRepositoryToken(Article));
+
+    // Mock the RSS parser globally to prevent real network requests
+    const mockParser = {
+      parseURL: jest.fn().mockResolvedValue({ items: [] }),
+    };
+    (service as any).parser = mockParser;
   });
 
   afterEach(() => {
@@ -44,9 +71,9 @@ describe('ScrapingService', () => {
 
   describe('scrapeImmediately', () => {
     it('should validate existing sources', async () => {
-      const result = await service.scrapeImmediately('idnes.cz');
+      const result = await service.scrapeImmediately('test-source');
       expect(result).toBeDefined();
-      expect(result.source).toBe('idnes.cz');
+      expect(result.source).toBe('test-source');
       expect(result.status).toBe('scheduled');
     });
 
@@ -64,7 +91,7 @@ describe('ScrapingService', () => {
 
     it('should reject invalid sources', async () => {
       await expect(service.scrapeImmediately('invalid-source')).rejects.toThrow(
-        'Invalid source: invalid-source',
+        'Invalid source: invalid-source. Valid sources are: test-source',
       );
     });
 
@@ -83,7 +110,7 @@ describe('ScrapingService', () => {
       (service as any).parser = mockParser;
 
       // This should not throw an error even if background processing fails
-      const result = await service.scrapeImmediately('idnes.cz');
+      const result = await service.scrapeImmediately('test-source');
       expect(result).toBeDefined();
       expect(result.status).toBe('scheduled');
 
@@ -95,7 +122,7 @@ describe('ScrapingService', () => {
       // Mock the parser to succeed for some sources and fail for others
       const mockParser = {
         parseURL: jest.fn().mockImplementation((url) => {
-          if (url.includes('idnes.cz')) {
+          if (url.includes('test-source')) {
             return Promise.resolve({ items: [{ title: 'Test', link: 'http://test.com' }] });
           }
           return Promise.reject(new Error('Some sources fail'));
@@ -145,7 +172,7 @@ describe('ScrapingService', () => {
         addSelect: jest.fn().mockReturnThis(),
         groupBy: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([
-          { source: 'idnes.cz', count: '50' },
+          { source: 'test-source', count: '50' },
           { source: 'denik.cz', count: '30' },
           { source: 'mfdnes.cz', count: '20' },
         ]),
@@ -154,7 +181,7 @@ describe('ScrapingService', () => {
       const stats = await service.getScrapingStats();
       expect(stats.totalArticles).toBe(100);
       expect(stats.articlesBySource).toEqual({
-        'idnes.cz': 50,
+        'test-source': 50,
         'denik.cz': 30,
         'mfdnes.cz': 20,
       });
@@ -189,7 +216,7 @@ describe('ScrapingService', () => {
       // Mock the parser to fail for some sources but succeed for others
       const mockParser = {
         parseURL: jest.fn().mockImplementation((url) => {
-          if (url.includes('idnes.cz')) {
+          if (url.includes('test-source')) {
             return Promise.reject(new Error('Source unavailable'));
           }
           return Promise.resolve({ items: [] });
@@ -206,7 +233,7 @@ describe('ScrapingService', () => {
     it('should handle RSS parsing errors gracefully', async () => {
       // We can't easily test the private method directly, but we can test it indirectly
       // by calling scrapeImmediately and checking that errors are handled
-      const result = await service.scrapeImmediately('idnes.cz');
+      const result = await service.scrapeImmediately('test-source');
       expect(result.status).toBe('scheduled');
     });
 
@@ -538,7 +565,7 @@ describe('ScrapingService', () => {
       };
       (service as any).parser = mockParser;
 
-      const result = await service.scrapeImmediately('idnes.cz');
+      const result = await service.scrapeImmediately('test-source');
       expect(result.status).toBe('scheduled');
 
       // Wait for setImmediate to complete
@@ -551,7 +578,7 @@ describe('ScrapingService', () => {
       };
       (service as any).parser = mockParser;
 
-      const result = await service.scrapeImmediately('idnes.cz');
+      const result = await service.scrapeImmediately('test-source');
       expect(result.status).toBe('scheduled');
 
       // Wait for setImmediate to complete
@@ -702,7 +729,7 @@ describe('ScrapingService', () => {
       mockRepository.findOne.mockResolvedValue(null);
       mockRepository.save.mockResolvedValue({} as any);
 
-      const result = await service.scrapeImmediately('idnes.cz');
+      const result = await service.scrapeImmediately('test-source');
       expect(result.status).toBe('scheduled');
 
       // Wait for setImmediate to complete
@@ -737,7 +764,7 @@ describe('ScrapingService', () => {
     it('should handle background processing with mixed success and failure', async () => {
       const mockParser = {
         parseURL: jest.fn().mockImplementation((url) => {
-          if (url.includes('idnes.cz')) {
+          if (url.includes('test-source')) {
             return Promise.resolve({ items: [{ title: 'Test', link: 'http://test.com' }] });
           }
           return Promise.reject(new Error('Some sources fail'));
