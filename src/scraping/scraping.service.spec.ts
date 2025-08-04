@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ScrapingService } from './scraping.service';
 import { Article } from '../entities/article.entity';
+import { getSourcesRecord } from './constants';
 
 describe('ScrapingService', () => {
   let service: ScrapingService;
@@ -49,39 +50,11 @@ describe('ScrapingService', () => {
       expect(result.status).toBe('scheduled');
     });
 
-    it('should validate existing Czech news sources', async () => {
-      const existingSources = [
-        'idnes.cz',
-        'hn.cz-byznys',
-        'hn.cz-domaci',
-        'hn.cz-zahranicni',
-        'hn.cz-nazory',
-        'hn.cz-tech',
-        'aktualne.cz',
-        'novinky.cz',
-        'blesk.cz',
-        'ct24.cz',
-        'ceskatelevize.cz',
-        'e15.cz',
-        'lidovky.cz',
-        'sport.cz',
-        'lupa.cz',
-        'zive.cz',
-        'super.cz',
-        'reflex.cz',
-        'forbes.cz',
-        'echo24.cz',
-        'denik.cz',
-        'irozhlas.cz',
-        'irozhlas-domov',
-        'irozhlas-svet',
-        'irozhlas-veda-technologie',
-        'ceskenoviny-vse',
-        'ceskenoviny-cr',
-        'ceskenoviny-svet',
-      ];
+    it('should validate all sources from constants', async () => {
+      const sources = getSourcesRecord();
+      const sourceNames = Object.keys(sources);
 
-      for (const source of existingSources) {
+      for (const source of sourceNames) {
         const result = await service.scrapeImmediately(source);
         expect(result).toBeDefined();
         expect(result.source).toBe(source);
@@ -91,7 +64,7 @@ describe('ScrapingService', () => {
 
     it('should reject invalid sources', async () => {
       await expect(service.scrapeImmediately('invalid-source')).rejects.toThrow(
-        'Invalid source: invalid-source'
+        'Invalid source: invalid-source',
       );
     });
 

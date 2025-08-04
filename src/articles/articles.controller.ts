@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Article } from '../entities/article.entity';
 import { ScrapingService } from '../scraping/scraping.service';
 
@@ -27,7 +27,7 @@ export class ArticlesController {
     @InjectRepository(Article)
     private readonly _articleRepository: Repository<Article>,
     private readonly _scrapingService: ScrapingService,
-  ) { }
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all articles with filtering and pagination' })
@@ -182,7 +182,10 @@ export class ArticlesController {
     // Parse date parameter (YYYY-MM-DD format)
     const targetDate = new Date(date);
     if (isNaN(targetDate.getTime())) {
-      throw new HttpException('Invalid date format. Use YYYY-MM-DD', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Invalid date format. Use YYYY-MM-DD',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     // Set time range for the entire day
@@ -209,7 +212,7 @@ export class ArticlesController {
         total,
         pages: Math.ceil(total / limit),
       },
-      date: date,
+      date,
     };
   }
 
@@ -222,7 +225,10 @@ export class ArticlesController {
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ) {
     if (days <= 0 || days > 365) {
-      throw new HttpException('Days must be between 1 and 365', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Days must be between 1 and 365',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const startDate = new Date();
@@ -245,7 +251,7 @@ export class ArticlesController {
         total,
         pages: Math.ceil(total / limit),
       },
-      days: days,
+      days,
       fromDate: startDate.toISOString(),
     };
   }

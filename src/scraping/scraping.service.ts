@@ -7,6 +7,27 @@ import { Article } from '../entities/article.entity';
 import * as crypto from 'crypto';
 import { RSS_SOURCES, getSourcesRecord } from './constants';
 
+interface RssItem {
+  title?: string;
+  link?: string;
+  content?: string;
+  summary?: string;
+  description?: string;
+  creator?: string;
+  author?: string;
+  'dc:creator'?: string;
+  pubDate?: string;
+  published?: string;
+  'dc:date'?: string;
+  'media:content'?: {
+    url?: string;
+  };
+  enclosure?: {
+    url?: string;
+    type?: string;
+  };
+}
+
 @Injectable()
 export class ScrapingService {
   private readonly parser: Parser;
@@ -29,10 +50,10 @@ export class ScrapingService {
 
     // Scrape all sources concurrently
     const scrapingPromises = RSS_SOURCES.map(({ name, url }) =>
-      this.scrapeSource(name, url).catch(error => {
+      this.scrapeSource(name, url).catch((error) => {
         this.logger.error(`Failed to scrape ${name}:`, error);
         return null;
-      })
+      }),
     );
 
     await Promise.all(scrapingPromises);
@@ -40,14 +61,18 @@ export class ScrapingService {
   }
 
   async scrapeImmediately(source?: string) {
-    this.logger.log(`Scheduling immediate scraping${source ? ` for ${source}` : ' for all sources'}...`);
+    this.logger.log(
+      `Scheduling immediate scraping${source ? ` for ${source}` : ' for all sources'}...`,
+    );
     this.lastRunTime = new Date();
 
     const sources = getSourcesRecord();
 
     // Validate source if provided
     if (source && !sources[source]) {
-      throw new Error(`Invalid source: ${source}. Valid sources are: ${Object.keys(sources).join(', ')}`);
+      throw new Error(
+        `Invalid source: ${source}. Valid sources are: ${Object.keys(sources).join(', ')}`,
+      );
     }
 
     // Run scraping in background
@@ -58,19 +83,24 @@ export class ScrapingService {
           this.logger.log(`Background scraping completed for ${source}`);
         } else {
           // Scrape all sources concurrently
-          const scrapingPromises = Object.entries(sources).map(([sourceName, url]) =>
-            this.scrapeSource(sourceName, url).catch(error => {
-              this.logger.error(`Failed to scrape ${sourceName}:`, error);
-              return null;
-            })
+          const scrapingPromises = Object.entries(sources).map(
+            ([sourceName, url]) =>
+              this.scrapeSource(sourceName, url).catch((error) => {
+                this.logger.error(`Failed to scrape ${sourceName}:`, error);
+                return null;
+              }),
           );
 
           await Promise.all(scrapingPromises);
           this.logger.log('Background scraping completed for all sources');
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        this.logger.error(`Background scraping failed${source ? ` for ${source}` : ''}`, errorMessage);
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(
+          `Background scraping failed${source ? ` for ${source}` : ''}`,
+          errorMessage,
+        );
       }
     });
 
@@ -132,14 +162,16 @@ export class ScrapingService {
       }
       this.logger.log(`Found ${newArticles} new articles from ${source}.`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to scrape ${source}: ${errorMessage}`);
     }
   }
 
-  private extractDescription(item: any): string | null {
+  private extractDescription(item: RssItem): string | null {
     // Try different possible description fields
-    const description = item.content ?? item.summary ?? item.description ?? null;
+    const description =
+      item.content ?? item.summary ?? item.description ?? null;
 
     if (!description) return null;
 
@@ -147,12 +179,12 @@ export class ScrapingService {
     return description.replace(/<[^>]*>/g, '').trim();
   }
 
-  private extractAuthor(item: any): string | null {
+  private extractAuthor(item: RssItem): string | null {
     // Try different possible author fields
     return item.creator ?? item.author ?? item['dc:creator'] ?? null;
   }
 
-  private extractPublishedDate(item: any): Date | null {
+  private extractPublishedDate(item: RssItem): Date | null {
     // Try different possible date fields
     const dateStr = item.pubDate ?? item.published ?? item['dc:date'] ?? null;
 
@@ -165,13 +197,17 @@ export class ScrapingService {
     }
   }
 
-  private extractImageUrl(item: any): string | null {
+  private extractImageUrl(item: RssItem): string | null {
     // Try to extract image URL from various sources
     if (item['media:content'] && item['media:content'].url) {
       return item['media:content'].url;
     }
 
-    if (item.enclosure && item.enclosure.url && item.enclosure.type?.startsWith('image/')) {
+    if (
+      item.enclosure &&
+      item.enclosure.url &&
+      item.enclosure.type?.startsWith('image/')
+    ) {
       return item.enclosure.url;
     }
 
