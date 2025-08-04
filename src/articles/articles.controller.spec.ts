@@ -176,9 +176,13 @@ describe('ArticlesController', () => {
     });
 
     it('should handle database errors gracefully', async () => {
-      mockQueryBuilder.getManyAndCount.mockRejectedValue(new Error('Database error'));
+      mockQueryBuilder.getManyAndCount.mockRejectedValue(
+        new Error('Database error'),
+      );
 
-      await expect(controller.getArticles(1, 20)).rejects.toThrow('Database error');
+      await expect(controller.getArticles(1, 20)).rejects.toThrow(
+        'Database error',
+      );
     });
 
     it('should handle empty results', async () => {
@@ -270,9 +274,13 @@ describe('ArticlesController', () => {
     });
 
     it('should handle database errors gracefully', async () => {
-      mockArticleRepository.findOne.mockRejectedValue(new Error('Database connection failed'));
+      mockArticleRepository.findOne.mockRejectedValue(
+        new Error('Database connection failed'),
+      );
 
-      await expect(controller.getArticle(1)).rejects.toThrow('Database connection failed');
+      await expect(controller.getArticle(1)).rejects.toThrow(
+        'Database connection failed',
+      );
     });
   });
 

@@ -63,7 +63,7 @@ describe('Constants', () => {
       const sourcesRecord = getSourcesRecord();
 
       // Check that all sources from RSS_SOURCES are present in the record
-      RSS_SOURCES.forEach(source => {
+      RSS_SOURCES.forEach((source) => {
         expect(sourcesRecord[source.name]).toBeDefined();
         expect(typeof sourcesRecord[source.name]).toBe('string');
         expect(sourcesRecord[source.name]).toMatch(/^https?:\/\//);

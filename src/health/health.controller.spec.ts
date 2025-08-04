@@ -101,10 +101,14 @@ describe('HealthController', () => {
     });
 
     it('should handle database errors gracefully', async () => {
-      mockArticleRepository.count.mockRejectedValue(new Error('Database connection failed'));
+      mockArticleRepository.count.mockRejectedValue(
+        new Error('Database connection failed'),
+      );
       mockScrapingService.getLastRunTime.mockReturnValue(null);
 
-      await expect(controller.getHealth()).rejects.toThrow('Database connection failed');
+      await expect(controller.getHealth()).rejects.toThrow(
+        'Database connection failed',
+      );
     });
   });
 
@@ -177,9 +181,13 @@ describe('HealthController', () => {
 
     it('should handle scraping service errors gracefully', async () => {
       mockSchedulerRegistry.getCronJob.mockReturnValue({ name: 'scrapeAll' });
-      mockScrapingService.getScrapingStats.mockRejectedValue(new Error('Scraping service error'));
+      mockScrapingService.getScrapingStats.mockRejectedValue(
+        new Error('Scraping service error'),
+      );
 
-      await expect(controller.getScrapingStatus()).rejects.toThrow('Scraping service error');
+      await expect(controller.getScrapingStatus()).rejects.toThrow(
+        'Scraping service error',
+      );
     });
   });
 
@@ -216,9 +224,13 @@ describe('HealthController', () => {
     });
 
     it('should handle scraping service errors gracefully', async () => {
-      mockScrapingService.getScrapingStats.mockRejectedValue(new Error('Metrics service error'));
+      mockScrapingService.getScrapingStats.mockRejectedValue(
+        new Error('Metrics service error'),
+      );
 
-      await expect(controller.getMetrics()).rejects.toThrow('Metrics service error');
+      await expect(controller.getMetrics()).rejects.toThrow(
+        'Metrics service error',
+      );
     });
 
     // Additional tests to cover uncovered branches
