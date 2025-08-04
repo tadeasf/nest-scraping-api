@@ -19,7 +19,7 @@ async function getPublicIP(): Promise<string | null> {
         try {
           const result = JSON.parse(data);
           resolve(result.ip);
-        } catch (error) {
+        } catch (_error) {
           resolve(null);
         }
       });
