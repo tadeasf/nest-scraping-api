@@ -257,14 +257,25 @@ describe('ScrapingService', () => {
   });
 
   describe('scrapeImmediately', () => {
-    it('should scrape all sources when no source specified', async () => {
+    it('should schedule scraping for all sources when no source specified', async () => {
       const scrapeSourceSpy = jest.spyOn(
         service,
         'scrapeSource' as keyof ScrapingService,
       );
       (scrapeSourceSpy as jest.Mock).mockResolvedValue(undefined);
 
-      await service.scrapeImmediately();
+      const result = await service.scrapeImmediately();
+
+      expect(result).toEqual({
+        jobId: expect.stringMatching(/^scrape_\d+$/),
+        status: 'scheduled',
+        source: 'all',
+        scheduledAt: expect.any(Date),
+        message: 'Scraping scheduled for all sources',
+      });
+
+      // Wait for background job to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(scrapeSourceSpy).toHaveBeenCalledTimes(5);
       expect(scrapeSourceSpy).toHaveBeenCalledWith(
@@ -291,14 +302,25 @@ describe('ScrapingService', () => {
       scrapeSourceSpy.mockRestore();
     });
 
-    it('should scrape specific source when source specified', async () => {
+    it('should schedule scraping for specific source when source specified', async () => {
       const scrapeSourceSpy = jest.spyOn(
         service,
         'scrapeSource' as keyof ScrapingService,
       );
       (scrapeSourceSpy as jest.Mock).mockResolvedValue(undefined);
 
-      await service.scrapeImmediately('novinky.cz');
+      const result = await service.scrapeImmediately('novinky.cz');
+
+      expect(result).toEqual({
+        jobId: expect.stringMatching(/^scrape_\d+$/),
+        status: 'scheduled',
+        source: 'novinky.cz',
+        scheduledAt: expect.any(Date),
+        message: 'Scraping scheduled for novinky.cz',
+      });
+
+      // Wait for background job to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(scrapeSourceSpy).toHaveBeenCalledTimes(1);
       expect(scrapeSourceSpy).toHaveBeenCalledWith(

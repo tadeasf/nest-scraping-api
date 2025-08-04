@@ -26,46 +26,83 @@ export class ScrapingService {
     this.logger.log('Starting hourly scraping...');
     this.lastRunTime = new Date();
 
-    await this.scrapeSource('idnes.cz', 'http://servis.idnes.cz/rss.asp');
-    await this.scrapeSource('hn.cz', 'https://rss.hn.cz/');
-    await this.scrapeSource(
-      'aktualne.cz',
-      'https://www.aktualne.cz/export-rss/r~b:article:rss/',
-    );
-    await this.scrapeSource('novinky.cz', 'https://www.novinky.cz/rss');
-    await this.scrapeSource(
-      'blesk.cz',
-      'https://www.blesk.cz/kategorie/2559/udalosti/rss/www.denik.cz',
+    const sources = [
+      { name: 'idnes.cz', url: 'http://servis.idnes.cz/rss.asp' },
+      { name: 'hn.cz-byznys', url: 'https://byznys.hn.cz/?m=rss' },
+      { name: 'hn.cz-domaci', url: 'https://domaci.hn.cz/?m=rss' },
+      { name: 'hn.cz-zahranicni', url: 'https://zahranicni.hn.cz/?m=rss' },
+      { name: 'hn.cz-nazory', url: 'https://nazory.hn.cz/?m=rss' },
+      { name: 'hn.cz-tech', url: 'https://tech.hn.cz/?m=rss' },
+      { name: 'aktualne.cz', url: 'https://www.aktualne.cz/export-rss/r~b:article:rss/' },
+      { name: 'novinky.cz', url: 'https://www.novinky.cz/rss' },
+      { name: 'blesk.cz', url: 'https://www.blesk.cz/rss' },
+    ];
+
+    // Scrape all sources concurrently
+    const scrapingPromises = sources.map(({ name, url }) =>
+      this.scrapeSource(name, url).catch(error => {
+        this.logger.error(`Failed to scrape ${name}:`, error);
+        return null;
+      })
     );
 
+    await Promise.all(scrapingPromises);
     this.logger.log('Hourly scraping completed');
   }
 
   async scrapeImmediately(source?: string) {
-    this.logger.log(`Starting immediate scraping${source ? ` for ${source}` : ' for all sources'}...`);
+    this.logger.log(`Scheduling immediate scraping${source ? ` for ${source}` : ' for all sources'}...`);
     this.lastRunTime = new Date();
 
     const sources: Record<string, string> = {
       'idnes.cz': 'http://servis.idnes.cz/rss.asp',
-      'hn.cz': 'https://rss.hn.cz/',
+      'hn.cz-byznys': 'https://byznys.hn.cz/?m=rss',
+      'hn.cz-domaci': 'https://domaci.hn.cz/?m=rss',
+      'hn.cz-zahranicni': 'https://zahranicni.hn.cz/?m=rss',
+      'hn.cz-nazory': 'https://nazory.hn.cz/?m=rss',
+      'hn.cz-tech': 'https://tech.hn.cz/?m=rss',
       'aktualne.cz': 'https://www.aktualne.cz/export-rss/r~b:article:rss/',
       'novinky.cz': 'https://www.novinky.cz/rss',
-      'blesk.cz': 'https://www.blesk.cz/kategorie/2559/udalosti/rss/www.denik.cz',
+      'blesk.cz': 'https://www.blesk.cz/rss',
     };
 
-    if (source) {
-      if (!sources[source]) {
-        throw new Error(`Invalid source: ${source}. Valid sources are: ${Object.keys(sources).join(', ')}`);
-      }
-      await this.scrapeSource(source, sources[source]);
-      this.logger.log(`Immediate scraping completed for ${source}`);
-    } else {
-      // Scrape all sources
-      for (const [sourceName, url] of Object.entries(sources)) {
-        await this.scrapeSource(sourceName, url);
-      }
-      this.logger.log('Immediate scraping completed for all sources');
+    // Validate source if provided
+    if (source && !sources[source]) {
+      throw new Error(`Invalid source: ${source}. Valid sources are: ${Object.keys(sources).join(', ')}`);
     }
+
+    // Run scraping in background
+    setImmediate(async () => {
+      try {
+        if (source) {
+          await this.scrapeSource(source, sources[source]);
+          this.logger.log(`Background scraping completed for ${source}`);
+        } else {
+          // Scrape all sources concurrently
+          const scrapingPromises = Object.entries(sources).map(([sourceName, url]) =>
+            this.scrapeSource(sourceName, url).catch(error => {
+              this.logger.error(`Failed to scrape ${sourceName}:`, error);
+              return null;
+            })
+          );
+
+          await Promise.all(scrapingPromises);
+          this.logger.log('Background scraping completed for all sources');
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Background scraping failed${source ? ` for ${source}` : ''}`, errorMessage);
+      }
+    });
+
+    // Return job details immediately
+    return {
+      jobId: `scrape_${Date.now()}`,
+      status: 'scheduled',
+      source: source || 'all',
+      scheduledAt: this.lastRunTime,
+      message: `Scraping scheduled${source ? ` for ${source}` : ' for all sources'}`,
+    };
   }
 
   private async scrapeSource(source: string, url: string) {
@@ -76,7 +113,8 @@ export class ScrapingService {
       for (const item of feed.items) {
         if (!item.title || !item.link) continue;
 
-        const content = item.content ?? item.summary ?? '';
+        // Extract content from various possible fields
+        const content = item.content ?? item.summary ?? item.description ?? '';
         const contentHash = crypto
           .createHash('sha256')
           .update(content)
@@ -91,6 +129,18 @@ export class ScrapingService {
           article.url = item.link;
           article.contentHash = contentHash;
           article.source = source;
+
+          // Extract additional data
+          const description = this.extractDescription(item);
+          const author = this.extractAuthor(item);
+          const publishedAt = this.extractPublishedDate(item);
+          const imageUrl = this.extractImageUrl(item);
+
+          if (description) article.description = description;
+          if (author) article.author = author;
+          if (publishedAt) article.publishedAt = publishedAt;
+          if (imageUrl) article.imageUrl = imageUrl;
+
           await this._articleRepository.save(article);
           newArticles++;
         }
@@ -101,6 +151,50 @@ export class ScrapingService {
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to scrape ${source}`, errorMessage);
     }
+  }
+
+  private extractDescription(item: any): string | null {
+    // Try different possible description fields
+    const description = item.content ?? item.summary ?? item.description ?? null;
+
+    if (!description) return null;
+
+    // Remove HTML tags if present
+    return description.replace(/<[^>]*>/g, '').trim();
+  }
+
+  private extractAuthor(item: any): string | null {
+    // Try different possible author fields
+    return item.creator ?? item.author ?? item['dc:creator'] ?? null;
+  }
+
+  private extractPublishedDate(item: any): Date | null {
+    // Try different possible date fields
+    const dateStr = item.pubDate ?? item.published ?? item['dc:date'] ?? null;
+
+    if (!dateStr) return null;
+
+    try {
+      return new Date(dateStr);
+    } catch {
+      return null;
+    }
+  }
+
+  private extractImageUrl(item: any): string | null {
+    // Try to extract image URL from various sources
+    if (item['media:content'] && item['media:content'].url) {
+      return item['media:content'].url;
+    }
+
+    if (item.enclosure && item.enclosure.url && item.enclosure.type?.startsWith('image/')) {
+      return item.enclosure.url;
+    }
+
+    // Try to extract from description if it contains an image
+    const description = item.content ?? item.summary ?? item.description ?? '';
+    const imgMatch = description.match(/<img[^>]+src="([^"]+)"/);
+    return imgMatch ? imgMatch[1] : null;
   }
 
   getLastRunTime(): Date | null {

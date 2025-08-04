@@ -265,8 +265,15 @@ describe('ArticlesController', () => {
 
   describe('triggerScraping', () => {
     it('should trigger scraping for all sources when no source specified', async () => {
+      const mockJobDetails = {
+        jobId: 'scrape_1234567890',
+        status: 'scheduled',
+        source: 'all',
+        scheduledAt: new Date(),
+        message: 'Scraping scheduled for all sources',
+      };
       (_scrapingService.scrapeImmediately as jest.Mock).mockResolvedValue(
-        undefined,
+        mockJobDetails,
       );
 
       const result = await controller.triggerScraping();
@@ -276,15 +283,21 @@ describe('ArticlesController', () => {
       );
       expect(result).toEqual({
         success: true,
-        message: 'Scraping triggered successfully for all sources',
+        ...mockJobDetails,
         timestamp: expect.any(String),
-        source: 'all',
       });
     });
 
     it('should trigger scraping for specific source', async () => {
+      const mockJobDetails = {
+        jobId: 'scrape_1234567890',
+        status: 'scheduled',
+        source: 'novinky.cz',
+        scheduledAt: new Date(),
+        message: 'Scraping scheduled for novinky.cz',
+      };
       (_scrapingService.scrapeImmediately as jest.Mock).mockResolvedValue(
-        undefined,
+        mockJobDetails,
       );
 
       const result = await controller.triggerScraping('novinky.cz');
@@ -294,9 +307,8 @@ describe('ArticlesController', () => {
       );
       expect(result).toEqual({
         success: true,
-        message: 'Scraping triggered successfully for novinky.cz',
+        ...mockJobDetails,
         timestamp: expect.any(String),
-        source: 'novinky.cz',
       });
     });
   });

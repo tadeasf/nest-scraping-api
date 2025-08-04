@@ -27,7 +27,7 @@ export class ArticlesController {
     @InjectRepository(Article)
     private readonly _articleRepository: Repository<Article>,
     private readonly _scrapingService: ScrapingService,
-  ) {}
+  ) { }
 
   @Get()
   @ApiOperation({ summary: 'Get all articles with filtering and pagination' })
@@ -105,10 +105,17 @@ export class ArticlesController {
       .groupBy('article.source')
       .getRawMany<SourceCount>();
 
-    // Note: Since Article entity doesn't have a createdAt field,
-    // we'll set todayArticles to 0 for now
-    // TODO: Add createdAt field to Article entity for proper date-based queries
-    const todayArticles = 0;
+    // Get today's articles using createdAt field
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const todayArticles = await this._articleRepository
+      .createQueryBuilder('article')
+      .where('article.createdAt >= :today', { today })
+      .andWhere('article.createdAt < :tomorrow', { tomorrow })
+      .getCount();
 
     const sourceStats: Record<string, number> = {};
     for (const item of articlesBySource) {
@@ -164,6 +171,85 @@ export class ArticlesController {
     };
   }
 
+  @Get('date/:date')
+  @ApiOperation({ summary: 'Get articles by date (YYYY-MM-DD format)' })
+  @ApiResponse({ status: 200, description: 'Articles from specific date' })
+  async getArticlesByDate(
+    @Param('date') date: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+  ) {
+    // Parse date parameter (YYYY-MM-DD format)
+    const targetDate = new Date(date);
+    if (isNaN(targetDate.getTime())) {
+      throw new HttpException('Invalid date format. Use YYYY-MM-DD', HttpStatus.BAD_REQUEST);
+    }
+
+    // Set time range for the entire day
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const [articles, total] = await this._articleRepository
+      .createQueryBuilder('article')
+      .where('article.createdAt >= :startOfDay', { startOfDay })
+      .andWhere('article.createdAt <= :endOfDay', { endOfDay })
+      .orderBy('article.id', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      articles,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+      date: date,
+    };
+  }
+
+  @Get('recent/:days')
+  @ApiOperation({ summary: 'Get articles from the last N days' })
+  @ApiResponse({ status: 200, description: 'Recent articles' })
+  async getRecentArticles(
+    @Param('days', ParseIntPipe) days: number,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+  ) {
+    if (days <= 0 || days > 365) {
+      throw new HttpException('Days must be between 1 and 365', HttpStatus.BAD_REQUEST);
+    }
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const [articles, total] = await this._articleRepository
+      .createQueryBuilder('article')
+      .where('article.createdAt >= :startDate', { startDate })
+      .orderBy('article.id', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      articles,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+      days: days,
+      fromDate: startDate.toISOString(),
+    };
+  }
+
   @Post('scrape')
   @ApiOperation({ summary: 'Trigger immediate scraping' })
   @ApiResponse({ status: 200, description: 'Scraping triggered successfully' })
@@ -175,15 +261,12 @@ export class ArticlesController {
   })
   async triggerScraping(@Query('source') source?: string) {
     try {
-      await this._scrapingService.scrapeImmediately(source);
+      const jobDetails = await this._scrapingService.scrapeImmediately(source);
 
       return {
         success: true,
-        message: source
-          ? `Scraping triggered successfully for ${source}`
-          : 'Scraping triggered successfully for all sources',
+        ...jobDetails,
         timestamp: new Date().toISOString(),
-        source: source || 'all',
       };
     } catch (error) {
       if (error instanceof Error && error.message.includes('Invalid source')) {

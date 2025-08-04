@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
 
 @Entity()
 export class Article {
@@ -16,4 +16,19 @@ export class Article {
 
   @Column()
   source: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
+  @Column({ nullable: true })
+  author: string;
+
+  @Column({ type: 'datetime', nullable: true })
+  publishedAt: Date;
+
+  @Column({ nullable: true })
+  imageUrl: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
 }
