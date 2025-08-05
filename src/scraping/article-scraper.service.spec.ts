@@ -169,5 +169,70 @@ describe('ArticleScraperService', () => {
         50,
       );
     });
+
+    it('should filter out known paywall sources before scraping', async () => {
+      // Create articles with known paywall sources
+      const articles = [
+        {
+          id: 1,
+          title: 'Paywall Article 1',
+          url: 'https://echo24.cz/article1',
+          source: 'echo24.cz',
+          content: null,
+        },
+        {
+          id: 2,
+          title: 'Paywall Article 2',
+          url: 'https://hn.cz/article2',
+          source: 'hn.cz',
+          content: null,
+        },
+        {
+          id: 3,
+          title: 'Regular Article',
+          url: 'https://idnes.cz/article3',
+          source: 'idnes.cz',
+          content: null,
+        },
+      ].map((data) => {
+        const article = new Article();
+        Object.assign(article, data);
+        return article;
+      });
+
+      // Mock the scrapeArticleWithSemaphore method
+      const scrapeSpy = jest
+        .spyOn(service as any, 'scrapeArticleWithSemaphore')
+        .mockResolvedValue({
+          success: true,
+          content: 'Test content',
+          status: 'success',
+        });
+
+      // Mock the updateArticleScrapingStatus method
+      const updateStatusSpy = jest
+        .spyOn(service as any, 'updateArticleScrapingStatus')
+        .mockResolvedValue(undefined);
+
+      await service.scrapeArticlesContent(articles);
+
+      // Verify that scrapeArticleWithSemaphore was only called for non-paywall sources
+      expect(scrapeSpy).toHaveBeenCalledTimes(1); // Only idnes.cz
+      expect(scrapeSpy).toHaveBeenCalledWith(articles[2]); // Only the regular article
+
+      // Verify that paywall articles were marked as skipped
+      expect(updateStatusSpy).toHaveBeenCalledWith(
+        1,
+        'paywall_skipped',
+        null,
+        'Known paywall source - auto-skipped',
+      );
+      expect(updateStatusSpy).toHaveBeenCalledWith(
+        2,
+        'paywall_skipped',
+        null,
+        'Known paywall source - auto-skipped',
+      );
+    });
   });
 });

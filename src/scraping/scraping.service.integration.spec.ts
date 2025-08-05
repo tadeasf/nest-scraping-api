@@ -4,8 +4,6 @@ import { ScrapingService } from './scraping.service';
 import { ArticleScraperService } from './article-scraper.service';
 import { Article } from '../entities/article.entity';
 import { Repository } from 'typeorm';
-import * as fs from 'fs';
-import * as path from 'path';
 
 // Suppress console.error during tests to reduce noise
 const originalConsoleError = console.error;
@@ -24,19 +22,11 @@ describe('ScrapingService Integration', () => {
   let mockParseURL: jest.Mock;
 
   beforeAll(async () => {
-    // Create a temporary SQLite database for testing
-    const testDbPath = path.join(__dirname, '../../../test-db.sqlite');
-
-    // Clean up any existing test database
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
-
     module = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({
           type: 'sqlite',
-          database: testDbPath,
+          database: ':memory:',
           entities: [Article],
           synchronize: true,
           dropSchema: true,
@@ -66,12 +56,6 @@ describe('ScrapingService Integration', () => {
 
   afterAll(async () => {
     await module.close();
-
-    // Clean up test database
-    const testDbPath = path.join(__dirname, '../../../test-db.sqlite');
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
   });
 
   beforeEach(async () => {

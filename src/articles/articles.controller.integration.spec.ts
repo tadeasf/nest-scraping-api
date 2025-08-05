@@ -6,8 +6,6 @@ import { ArticlesController } from './articles.controller';
 import { ScrapingService } from '../scraping/scraping.service';
 import { ArticleScraperService } from '../scraping/article-scraper.service';
 import { Article } from '../entities/article.entity';
-import * as fs from 'fs';
-import * as path from 'path';
 
 // Suppress console.error during tests to reduce noise
 const originalConsoleError = console.error;
@@ -28,19 +26,11 @@ describe('ArticlesController Integration', () => {
   let module: TestingModule;
 
   beforeAll(async () => {
-    // Create a temporary SQLite database for testing in /tmp directory
-    const testDbPath = path.join('/tmp', 'test-articles-db.sqlite');
-
-    // Clean up any existing test database
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
-
     module = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({
           type: 'sqlite',
-          database: testDbPath,
+          database: ':memory:',
           entities: [Article],
           synchronize: true,
           dropSchema: true,
@@ -89,12 +79,6 @@ describe('ArticlesController Integration', () => {
 
   afterAll(async () => {
     await app.close();
-
-    // Clean up test database
-    const testDbPath = path.join('/tmp', 'test-articles-db.sqlite');
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
   });
 
   beforeEach(async () => {

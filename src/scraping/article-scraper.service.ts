@@ -129,46 +129,88 @@ export class ArticleScraperService {
       `Found ${articles.length} articles to scrape content for in batch ${batchNumber}`,
     );
 
-    // Scrape articles concurrently with rate limiting
-    const scrapingPromises = articles.map((article) =>
-      this.scrapeArticleWithSemaphore(article),
-    );
+    // Separate articles into paywall and non-paywall sources
+    const paywallArticles: Article[] = [];
+    const scrapableArticles: Article[] = [];
 
-    const results = await Promise.allSettled(scrapingPromises);
+    articles.forEach((article) => {
+      if (this.isKnownPaywallSource(article.source)) {
+        paywallArticles.push(article);
+      } else {
+        scrapableArticles.push(article);
+      }
+    });
 
-    // Count results and track by source
+    // Handle known paywall sources immediately (no HTTP requests needed)
+    if (paywallArticles.length > 0) {
+      this.logger.log(
+        `Skipping ${paywallArticles.length} articles from known paywall sources: ${paywallArticles.map((a) => a.source).join(', ')}`,
+      );
+
+      const paywallPromises = paywallArticles.map(async (article) => {
+        await this.updateArticleScrapingStatus(
+          article.id,
+          'paywall_skipped',
+          null,
+          'Known paywall source - auto-skipped',
+        );
+        return {
+          success: false,
+          status: 'paywall_skipped',
+          error: 'Known paywall source - auto-skipped',
+        };
+      });
+
+      await Promise.all(paywallPromises);
+    }
+
+    // Only scrape articles from non-paywall sources
     let successCount = 0;
     let failCount = 0;
     const sourceStats: Record<string, { success: number; failed: number }> = {};
 
-    results.forEach((result, index) => {
-      const article = articles[index];
-      const source = article.source;
+    if (scrapableArticles.length > 0) {
+      this.logger.log(
+        `Processing ${scrapableArticles.length} articles from scrapable sources`,
+      );
 
-      if (!sourceStats[source]) {
-        sourceStats[source] = { success: 0, failed: 0 };
-      }
+      // Scrape articles concurrently with rate limiting
+      const scrapingPromises = scrapableArticles.map((article) =>
+        this.scrapeArticleWithSemaphore(article),
+      );
 
-      if (result.status === 'fulfilled' && result.value.success) {
-        successCount++;
-        sourceStats[source].success++;
-      } else {
-        failCount++;
-        sourceStats[source].failed++;
-      }
-    });
+      const results = await Promise.allSettled(scrapingPromises);
 
-    // Log batch summary with source breakdown
+      // Count results and track by source
+      results.forEach((result, index) => {
+        const article = scrapableArticles[index];
+        const source = article.source;
+
+        if (!sourceStats[source]) {
+          sourceStats[source] = { success: 0, failed: 0 };
+        }
+
+        if (result.status === 'fulfilled' && result.value.success) {
+          successCount++;
+          sourceStats[source].success++;
+        } else {
+          failCount++;
+          sourceStats[source].failed++;
+        }
+      });
+    }
+
+    // Add paywall articles to fail count
+    failCount += paywallArticles.length;
+
+    // Log batch statistics
     this.logger.log(
-      `Batch ${batchNumber} completed. Success: ${successCount}, Failed: ${failCount}`,
+      `Batch ${batchNumber} completed: ${successCount} success, ${failCount} failed (${paywallArticles.length} paywall skipped)`,
     );
 
-    // Log source-specific statistics
     Object.entries(sourceStats).forEach(([source, stats]) => {
-      const total = stats.success + stats.failed;
-      const successRate = ((stats.success / total) * 100).toFixed(1);
       this.logger.log(
-        `  [${source}]: ${stats.success}/${total} (${successRate}% success)`,
+        `  ${source}: ${stats.success} success, ${stats.failed} failed`,
       );
     });
 
@@ -234,25 +276,6 @@ export class ArticleScraperService {
   private async scrapeArticleContent(
     article: Article,
   ): Promise<ScrapingResult> {
-    // Check if this is a known paywall source and skip it
-    if (this.isKnownPaywallSource(article.source)) {
-      this.logger.log(`Skipping known paywall source: ${article.source}`);
-
-      // Update article status to indicate it was skipped due to paywall
-      await this.updateArticleScrapingStatus(
-        article.id,
-        'paywall_skipped',
-        null,
-        'Known paywall source - auto-skipped',
-      );
-
-      return {
-        success: false,
-        status: 'paywall_skipped',
-        error: 'Known paywall source - auto-skipped',
-      };
-    }
-
     try {
       const config = getSiteConfig(article.source);
 
@@ -341,34 +364,41 @@ export class ArticleScraperService {
       };
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ECONNABORTED') {
-          return {
-            success: false,
-            status: 'timeout',
-            error: 'Request timeout',
-          };
-        }
-        if (error.response?.status === 404) {
-          return {
-            success: false,
-            status: 'not_found',
-            error: 'Article not found (404)',
-          };
-        }
-        if (error.response?.status === 403) {
-          return {
-            success: false,
-            status: 'forbidden',
-            error: 'Access forbidden (403)',
-          };
-        }
-      }
+        const errorMessage = error.code || error.message;
+        this.logger.error(`Failed to scrape ${article.url}: ${errorMessage}`);
 
-      return {
-        success: false,
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
+        await this.updateArticleScrapingStatus(
+          article.id,
+          'error',
+          null,
+          errorMessage,
+        );
+
+        return {
+          success: false,
+          status: 'network_error',
+          error: errorMessage,
+        };
+      } else {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(
+          `Unexpected error scraping ${article.url}: ${errorMessage}`,
+        );
+
+        await this.updateArticleScrapingStatus(
+          article.id,
+          'error',
+          null,
+          errorMessage,
+        );
+
+        return {
+          success: false,
+          status: 'unknown_error',
+          error: errorMessage,
+        };
+      }
     }
   }
 
@@ -441,6 +471,10 @@ export class ArticleScraperService {
     if (content) {
       updateData.content = content;
       updateData.contentLength = content.length;
+    } else if (status === 'paywall_skipped') {
+      // Set placeholder content for paywall articles to prevent infinite loops
+      updateData.content = '[PAYWALL_SKIPPED]';
+      updateData.contentLength = 0;
     }
 
     await this._articleRepository.update(articleId, updateData);
