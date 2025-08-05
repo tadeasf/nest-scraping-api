@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Article } from './entities/article.entity';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ScrapingModule } from './scraping/scraping.module';
+import { NLPModule } from './nlp/nlp.module';
 import { HealthController } from './health/health.controller';
 import { ArticlesController } from './articles/articles.controller';
 
@@ -18,6 +19,7 @@ import { ArticlesController } from './articles/articles.controller';
     }),
     ScheduleModule.forRoot(),
     ScrapingModule,
+    NLPModule,
     TypeOrmModule.forFeature([Article]),
   ],
   controllers: [AppController, HealthController, ArticlesController],
