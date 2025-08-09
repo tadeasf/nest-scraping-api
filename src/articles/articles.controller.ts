@@ -327,13 +327,18 @@ export class ArticlesController {
       }
 
       // Trigger content scraping in background
-      setImmediate(async () => {
+      const immediate = setImmediate(async () => {
         try {
           await this._articleScraperService.scrapeArticlesContent(articles);
         } catch (_error) {
           // Background content scraping failed silently
         }
       });
+
+      // Prevent keeping the event loop alive during tests
+      if (typeof (immediate as any).unref === 'function') {
+        (immediate as any).unref();
+      }
 
       return {
         success: true,

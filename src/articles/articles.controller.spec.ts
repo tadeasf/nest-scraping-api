@@ -283,6 +283,20 @@ describe('ArticlesController', () => {
     });
   });
 
+  describe('triggerContentScraping', () => {
+    it('should pass default limit 50 when not provided', async () => {
+      (_articleRepository.find as jest.Mock).mockResolvedValue([]);
+
+      const result = await controller.triggerContentScraping();
+      expect(result.articlesToScrape).toBe(0);
+      expect(_articleRepository.find).toHaveBeenCalledWith({
+        where: { content: IsNull() },
+        order: { createdAt: 'DESC' },
+        take: 50,
+      });
+    });
+  });
+
   describe('getArticle', () => {
     it('should return article by ID', async () => {
       const mockArticle = {

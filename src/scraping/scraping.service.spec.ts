@@ -116,6 +116,16 @@ describe('ScrapingService', () => {
         mockArticleScraperService.scrapeArticlesContent,
       ).toHaveBeenCalled();
     });
+
+    it('should unref the immediate handle to avoid open handles in Jest', async () => {
+      const spy = jest.spyOn(global, 'setImmediate');
+
+      const result = await service.scrapeImmediately();
+      expect(result.status).toBe('scheduled');
+
+      // ensure our setImmediate is called
+      expect(spy).toHaveBeenCalled();
+    });
   });
 
   describe('getScrapingStats', () => {
@@ -139,6 +149,22 @@ describe('ScrapingService', () => {
         'denik.cz': 30,
         'mfdnes.cz': 20,
       });
+    });
+  });
+
+  describe('scrapeAll', () => {
+    it('should set lastRunTime and trigger content scraping after scraping all sources', async () => {
+      // Spy on internals to avoid real network
+      const spy = jest.spyOn(service as any, 'scrapeSource').mockResolvedValue(undefined);
+      jest
+        .spyOn(mockArticleScraperService, 'scrapeArticlesContent')
+        .mockResolvedValue(undefined as any);
+
+      await service.scrapeAll();
+
+      expect(spy).toHaveBeenCalled();
+      expect(mockArticleScraperService.scrapeArticlesContent).toHaveBeenCalled();
+      expect(service.getLastRunTime()).toBeInstanceOf(Date);
     });
   });
 

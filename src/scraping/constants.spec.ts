@@ -2,6 +2,8 @@ import {
   RSS_SOURCES,
   getSourcesRecord,
   KNOWN_PAYWALL_SOURCES,
+  getSiteConfig,
+  DEFAULT_SITE_CONFIG,
 } from './constants';
 
 describe('Constants', () => {
@@ -105,6 +107,26 @@ describe('Constants', () => {
       expect(KNOWN_PAYWALL_SOURCES).not.toContain('idnes.cz');
       expect(KNOWN_PAYWALL_SOURCES).not.toContain('aktualne.cz');
       expect(KNOWN_PAYWALL_SOURCES).not.toContain('novinky.cz');
+    });
+  });
+
+  describe('getSiteConfig', () => {
+    it('should return exact config for known source key', () => {
+      const cfg = getSiteConfig('novinky.cz');
+      expect(cfg).toBeDefined();
+      expect(Array.isArray(cfg.selectors)).toBe(true);
+    });
+
+    it('should match base domain inside composite source names', () => {
+      const cfg = getSiteConfig('hn.cz-byznys');
+      // Known site config for base domain 'hn.cz' should be returned
+      expect(cfg).toBeDefined();
+      expect(Array.isArray(cfg.selectors)).toBe(true);
+    });
+
+    it('should fall back to default config for unknown source', () => {
+      const cfg = getSiteConfig('unknown.example');
+      expect(cfg).toEqual(DEFAULT_SITE_CONFIG);
     });
   });
 });

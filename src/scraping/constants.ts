@@ -394,8 +394,20 @@ export const getSourcesRecord = (): Record<string, string> => {
 
 // Helper function to get site configuration for a given source
 export const getSiteConfig = (source: string): SiteConfig => {
-  // Extract base domain from source
-  const baseDomain = source.split('.')[0];
+  // Try exact match first
+  if (SITE_CONFIGS[source]) {
+    return SITE_CONFIGS[source];
+  }
 
-  return SITE_CONFIGS[baseDomain] || DEFAULT_SITE_CONFIG;
+  // Try to match base domain inside the source name (e.g. 'hn.cz-byznys' -> 'hn.cz')
+  const matchedKey = Object.keys(SITE_CONFIGS).find((key) =>
+    source.includes(key),
+  );
+
+  if (matchedKey) {
+    return SITE_CONFIGS[matchedKey];
+  }
+
+  // Fallback to default config
+  return DEFAULT_SITE_CONFIG;
 };
