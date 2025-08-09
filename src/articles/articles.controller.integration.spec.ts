@@ -1,12 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import { INestApplication } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { Repository } from 'typeorm/repository/Repository';
 import { ArticlesController } from './articles.controller';
 import { ScrapingService } from '../scraping/scraping.service';
+import { ArticleScraperService } from '../scraping/article-scraper.service';
 import { Article } from '../entities/article.entity';
-import * as fs from 'fs';
-import * as path from 'path';
 
 // Suppress console.error during tests to reduce noise
 const originalConsoleError = console.error;
@@ -23,30 +22,24 @@ describe('ArticlesController Integration', () => {
   let controller: ArticlesController;
   let articleRepository: Repository<Article>;
   let scrapingService: ScrapingService;
+  let articleScraperService: ArticleScraperService;
   let module: TestingModule;
 
   beforeAll(async () => {
-    // Create a temporary SQLite database for testing
-    const testDbPath = path.join(__dirname, '../../../test-articles-db.sqlite');
-
-    // Clean up any existing test database
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
-
     module = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({
           type: 'sqlite',
-          database: testDbPath,
+          database: ':memory:',
           entities: [Article],
           synchronize: true,
           dropSchema: true,
+          logging: false, // Disable logging to reduce noise
         }),
         TypeOrmModule.forFeature([Article]),
       ],
       controllers: [ArticlesController],
-      providers: [ScrapingService],
+      providers: [ScrapingService, ArticleScraperService],
     }).compile();
 
     app = module.createNestApplication();
@@ -57,22 +50,35 @@ describe('ArticlesController Integration', () => {
       getRepositoryToken(Article),
     );
     scrapingService = module.get<ScrapingService>(ScrapingService);
+    articleScraperService = module.get<ArticleScraperService>(
+      ArticleScraperService,
+    );
 
     // Mock the RSS parser to prevent real network requests
     const mockParser = {
       parseURL: jest.fn().mockResolvedValue({ items: [] }),
     };
     (scrapingService as any).parser = mockParser;
+
+    // Mock the ArticleScraperService to prevent real web scraping
+    (articleScraperService as any).scrapeArticlesContent = jest
+      .fn()
+      .mockResolvedValue(undefined);
+    (articleScraperService as any).getScrapingStats = jest
+      .fn()
+      .mockResolvedValue({
+        total: 0,
+        withContent: 0,
+        withoutContent: 0,
+        byStatus: {},
+      });
+
+    // Ensure database is properly initialized
+    await new Promise((resolve) => setTimeout(resolve, 100));
   });
 
   afterAll(async () => {
     await app.close();
-
-    // Clean up test database
-    const testDbPath = path.join(__dirname, '../../../test-articles-db.sqlite');
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
   });
 
   beforeEach(async () => {
@@ -136,7 +142,7 @@ describe('ArticlesController Integration', () => {
 
       expect(result.articles).toHaveLength(2);
       expect(
-        result.articles.every((article) => article.source === 'idnes.cz'),
+        result.articles.every((article: any) => article.source === 'idnes.cz'),
       ).toBe(true);
     });
 
@@ -157,10 +163,10 @@ describe('ArticlesController Integration', () => {
 
       expect(result.articles).toHaveLength(1);
       expect(
-        result.articles.every((article) => article.source === 'idnes.cz'),
+        result.articles.every((article: any) => article.source === 'idnes.cz'),
       ).toBe(true);
       expect(
-        result.articles.every((article) => article.title.includes('Test')),
+        result.articles.every((article: any) => article.title.includes('Test')),
       ).toBe(true);
     });
 
@@ -433,7 +439,7 @@ describe('ArticlesController Integration', () => {
 
       expect(result.articles).toHaveLength(2);
       expect(
-        result.articles.every((article) => article.source === 'idnes.cz'),
+        result.articles.every((article: any) => article.source === 'idnes.cz'),
       ).toBe(true);
       expect(result.pagination).toEqual({
         page: 1,
@@ -544,37 +550,42 @@ describe('ArticlesController Integration', () => {
 
   describe('getRecentArticles', () => {
     beforeEach(async () => {
-      // Create test articles with different dates
-      const now = new Date();
-      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const _twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-      const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
+      try {
+        // Create test articles with different dates
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const _twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+        const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
 
-      const testArticles = [
-        {
-          title: 'Recent Article 1',
-          url: 'https://example.com/recent1',
-          contentHash: 'hash1',
-          source: 'idnes.cz',
-          createdAt: now,
-        },
-        {
-          title: 'Recent Article 2',
-          url: 'https://example.com/recent2',
-          contentHash: 'hash2',
-          source: 'hn.cz',
-          createdAt: oneDayAgo,
-        },
-        {
-          title: 'Old Article',
-          url: 'https://example.com/old',
-          contentHash: 'hash3',
-          source: 'aktualne.cz',
-          createdAt: tenDaysAgo,
-        },
-      ];
+        const testArticles = [
+          {
+            title: 'Recent Article 1',
+            url: 'https://example.com/recent1',
+            contentHash: 'hash1',
+            source: 'idnes.cz',
+            createdAt: now,
+          },
+          {
+            title: 'Recent Article 2',
+            url: 'https://example.com/recent2',
+            contentHash: 'hash2',
+            source: 'hn.cz',
+            createdAt: oneDayAgo,
+          },
+          {
+            title: 'Old Article',
+            url: 'https://example.com/old',
+            contentHash: 'hash3',
+            source: 'aktualne.cz',
+            createdAt: tenDaysAgo,
+          },
+        ];
 
-      await articleRepository.save(testArticles);
+        await articleRepository.save(testArticles);
+      } catch (error) {
+        console.error('Error setting up test data:', error);
+        throw error;
+      }
     });
 
     it('should return recent articles', async () => {

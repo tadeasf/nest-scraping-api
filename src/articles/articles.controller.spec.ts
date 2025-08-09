@@ -1,14 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { ArticlesController } from './articles.controller';
 import { Article } from '../entities/article.entity';
 import { ScrapingService } from '../scraping/scraping.service';
+import { ArticleScraperService } from '../scraping/article-scraper.service';
 
 describe('ArticlesController', () => {
   let controller: ArticlesController;
   let _articleRepository: Repository<Article>;
   let _scrapingService: ScrapingService;
+  let _articleScraperService: ArticleScraperService;
 
   const mockQueryBuilder = {
     where: jest.fn().mockReturnThis(),
@@ -29,6 +31,7 @@ describe('ArticlesController', () => {
     findOne: jest.fn(),
     findAndCount: jest.fn(),
     count: jest.fn(),
+    find: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -45,6 +48,13 @@ describe('ArticlesController', () => {
             scrapeImmediately: jest.fn(),
           },
         },
+        {
+          provide: ArticleScraperService,
+          useValue: {
+            scrapeArticlesContent: jest.fn(),
+            getScrapingStats: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -53,6 +63,9 @@ describe('ArticlesController', () => {
       getRepositoryToken(Article),
     );
     _scrapingService = module.get<ScrapingService>(ScrapingService);
+    _articleScraperService = module.get<ArticleScraperService>(
+      ArticleScraperService,
+    );
   });
 
   afterEach(() => {
@@ -242,6 +255,44 @@ describe('ArticlesController', () => {
           'idnes.cz': 10,
           'hn.cz': 5,
         },
+      });
+    });
+  });
+
+  describe('getContentStats', () => {
+    it('should return content scraping statistics', async () => {
+      const mockStats = {
+        total: 100,
+        withContent: 60,
+        withoutContent: 40,
+        byStatus: {
+          success: 50,
+          failed: 10,
+          paywall: 5,
+        },
+      };
+
+      (_articleScraperService.getScrapingStats as jest.Mock).mockResolvedValue(
+        mockStats,
+      );
+
+      const result = await controller.getContentStats();
+
+      expect(result).toEqual(mockStats);
+      expect(_articleScraperService.getScrapingStats).toHaveBeenCalled();
+    });
+  });
+
+  describe('triggerContentScraping', () => {
+    it('should pass default limit 50 when not provided', async () => {
+      (_articleRepository.find as jest.Mock).mockResolvedValue([]);
+
+      const result = await controller.triggerContentScraping();
+      expect(result.articlesToScrape).toBe(0);
+      expect(_articleRepository.find).toHaveBeenCalledWith({
+        where: { content: IsNull() },
+        order: { createdAt: 'DESC' },
+        take: 50,
       });
     });
   });
@@ -479,6 +530,91 @@ describe('ArticlesController', () => {
 
       await expect(controller.triggerScraping()).rejects.toThrow(
         'Failed to trigger scraping',
+      );
+    });
+  });
+
+  describe('triggerContentScraping', () => {
+    it('should trigger content scraping for articles without content', async () => {
+      const mockArticles = [
+        {
+          id: 1,
+          title: 'Test Article 1',
+          url: 'http://example.com/1',
+          source: 'idnes.cz',
+          content: null,
+        },
+        {
+          id: 2,
+          title: 'Test Article 2',
+          url: 'http://example.com/2',
+          source: 'hn.cz',
+          content: null,
+        },
+      ];
+
+      mockArticleRepository.find.mockResolvedValue(
+        mockArticles as unknown as Article[],
+      );
+
+      const result = await controller.triggerContentScraping();
+
+      expect(result).toEqual({
+        success: true,
+        message: 'Content scraping scheduled for 2 articles',
+        articlesToScrape: 2,
+        timestamp: expect.any(String),
+      });
+
+      expect(mockArticleRepository.find).toHaveBeenCalledWith({
+        where: { content: IsNull() },
+        order: { createdAt: 'DESC' },
+        take: 50,
+      });
+    });
+
+    it('should handle no articles without content', async () => {
+      mockArticleRepository.find.mockResolvedValue([]);
+
+      const result = await controller.triggerContentScraping();
+
+      expect(result).toEqual({
+        success: true,
+        message: 'No articles found without content',
+        articlesToScrape: 0,
+        timestamp: expect.any(String),
+      });
+    });
+
+    it('should respect limit parameter', async () => {
+      const mockArticles = [
+        {
+          id: 1,
+          title: 'Test Article',
+          url: 'http://example.com/1',
+          source: 'idnes.cz',
+          content: null,
+        },
+      ];
+
+      mockArticleRepository.find.mockResolvedValue(
+        mockArticles as unknown as Article[],
+      );
+
+      await controller.triggerContentScraping('10');
+
+      expect(mockArticleRepository.find).toHaveBeenCalledWith({
+        where: { content: IsNull() },
+        order: { createdAt: 'DESC' },
+        take: 10,
+      });
+    });
+
+    it('should handle database errors gracefully', async () => {
+      mockArticleRepository.find.mockRejectedValue(new Error('Database error'));
+
+      await expect(controller.triggerContentScraping()).rejects.toThrow(
+        'Failed to trigger content scraping',
       );
     });
   });

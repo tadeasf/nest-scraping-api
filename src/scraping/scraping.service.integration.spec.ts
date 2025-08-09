@@ -1,10 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import { ScrapingService } from './scraping.service';
+import { ArticleScraperService } from './article-scraper.service';
 import { Article } from '../entities/article.entity';
 import { Repository } from 'typeorm';
-import * as fs from 'fs';
-import * as path from 'path';
 
 // Suppress console.error during tests to reduce noise
 const originalConsoleError = console.error;
@@ -23,26 +22,18 @@ describe('ScrapingService Integration', () => {
   let mockParseURL: jest.Mock;
 
   beforeAll(async () => {
-    // Create a temporary SQLite database for testing
-    const testDbPath = path.join(__dirname, '../../../test-db.sqlite');
-
-    // Clean up any existing test database
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
-
     module = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({
           type: 'sqlite',
-          database: testDbPath,
+          database: ':memory:',
           entities: [Article],
           synchronize: true,
           dropSchema: true,
         }),
         TypeOrmModule.forFeature([Article]),
       ],
-      providers: [ScrapingService],
+      providers: [ScrapingService, ArticleScraperService],
     }).compile();
 
     service = module.get<ScrapingService>(ScrapingService);
@@ -53,16 +44,18 @@ describe('ScrapingService Integration', () => {
     // Mock the RSS parser to prevent real network requests
     mockParseURL = jest.fn().mockResolvedValue({ items: [] });
     (service as any).parser = { parseURL: mockParseURL };
+
+    // Mock the ArticleScraperService to prevent real web scraping
+    const articleScraperService = module.get<ArticleScraperService>(
+      ArticleScraperService,
+    );
+    (articleScraperService as any).scrapeArticlesContent = jest
+      .fn()
+      .mockResolvedValue(undefined);
   });
 
   afterAll(async () => {
     await module.close();
-
-    // Clean up test database
-    const testDbPath = path.join(__dirname, '../../../test-db.sqlite');
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
   });
 
   beforeEach(async () => {
